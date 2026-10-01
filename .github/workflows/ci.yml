@@ -71,5 +71,15 @@ jobs:
           CSRF_TRUSTED_ORIGINS: https://demo.example.com
         run: python manage.py check --deploy --fail-level WARNING
 
+      - name: Collect static files
+        # Exercises the WhiteNoise manifest pipeline, and stops every test
+        # that builds the middleware stack from emitting "No directory at:
+        # .../staticfiles/" -- 61 warnings that drown out real ones.
+        #
+        # Works without a frontend build because STATICFILES_DIRS is
+        # conditional on frontend/dist existing; this collects Django's admin
+        # and DRF assets.
+        run: python manage.py collectstatic --noinput
+
       - name: Test
         run: pytest --cov=cards --cov-report=term-missing
