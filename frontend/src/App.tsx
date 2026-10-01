@@ -1,11 +1,19 @@
-import { useState } from 'react'
-import { RequestError, brew as runBrew } from './api'
+import { useEffect, useState } from 'react'
+import {
+  RequestError,
+  brew as runBrew,
+  getCommanderBySlug,
+  getConfig,
+} from './api'
 import type { BrewSettings } from './components/BrewForm'
 import { BrewForm } from './components/BrewForm'
 import { CollectionPanel } from './components/CollectionPanel'
 import { DeckResults } from './components/DeckResults'
+import { Footer } from './components/Footer'
+import { Landing } from './components/Landing'
 import { UpgradePathView } from './components/UpgradePathView'
 import { dollars } from './format'
+import { parseShareUrl, syncShareUrl } from './shareUrl'
 import type { Brew, Commander } from './types'
 import './App.css'
 
@@ -21,6 +29,10 @@ const DEFAULT_SETTINGS: BrewSettings = {
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('brew')
+  // null until /api/config/ answers. Fails closed: if the flag cannot be
+  // read, assume demo and hide the write UI. Hiding a feature is never a
+  // security problem, whereas showing one that 404s is a broken demo.
+  const [demoMode, setDemoMode] = useState<boolean | null>(null)
   const [commander, setCommander] = useState<Commander | null>(null)
   const [settings, setSettings] = useState<BrewSettings>(DEFAULT_SETTINGS)
   const [result, setResult] = useState<Brew | null>(null)
@@ -28,21 +40,73 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [minimumCents, setMinimumCents] = useState<number | null>(null)
 
-  async function submit() {
-    if (!commander) return
+  useEffect(() => {
+    getConfig().then(
+      (config) => setDemoMode(config.demo_mode),
+      () => setDemoMode(true),
+    )
+  }, [])
+
+  // Restore a shared link: resolve the commander slug, then brew. Runs once,
+  // and only when the URL actually carries parameters.
+  useEffect(() => {
+    const shared = parseShareUrl(window.location.search)
+    if (!shared) return
+
+    let cancelled = false
+    // Applied before resolving the slug, so a broken link still lands on the
+    // budget the sender intended -- pick a commander and it just works.
+    const restored = { ...DEFAULT_SETTINGS, ...shared.settings }
+    setSettings(restored)
+
+    setBusy(true)
+    getCommanderBySlug(shared.commander)
+      .then((cmd) => {
+        if (cancelled) return
+        setCommander(cmd)
+        return brewWith(cmd, restored)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setBusy(false)
+        // An unresolvable slug must say so. The alternative is a blank page
+        // and no way to tell a typo from a card that cannot be a commander.
+        setError(
+          err instanceof RequestError
+            ? err.message
+            : 'Could not load that shared link.',
+        )
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /**
+   * Brew with explicit arguments rather than reading state.
+   *
+   * Restoring a share URL sets the commander and settings and then brews
+   * immediately; reading them from state would use the previous render's
+   * values, because setState is asynchronous.
+   */
+  async function brewWith(cmd: Commander, s: BrewSettings) {
     setBusy(true)
     setError(null)
     setMinimumCents(null)
     try {
       const data = await runBrew({
-        commander_oracle_id: commander.oracle_id,
-        budget_cents: Math.round(settings.budgetDollars * 100),
-        strategy: settings.strategy,
-        owned_free: settings.ownedFree,
-        lands: settings.lands,
-        include_upgrade_path: settings.includeUpgradePath,
+        commander_oracle_id: cmd.oracle_id,
+        budget_cents: Math.round(s.budgetDollars * 100),
+        strategy: s.strategy,
+        owned_free: demoMode ? false : s.ownedFree,
+        lands: s.lands,
+        include_upgrade_path: s.includeUpgradePath,
       })
       setResult(data)
+      // Only after a successful brew: a URL that reproduces an error is not
+      // worth sharing.
+      syncShareUrl(cmd.slug, s)
     } catch (err) {
       setResult(null)
       if (err instanceof RequestError) {
@@ -58,27 +122,60 @@ export default function App() {
     }
   }
 
+  function submit() {
+    if (commander) void brewWith(commander, settings)
+  }
+
+  /**
+   * Run one of the landing page's worked examples.
+   *
+   * Goes through the same slug resolution a share URL uses, so the examples
+   * cannot drift from the thing they are demonstrating.
+   */
+  async function runExample(slug: string, budgetDollars: number, tier0: boolean) {
+    setBusy(true)
+    setError(null)
+    try {
+      const cmd = await getCommanderBySlug(slug)
+      const next: BrewSettings = {
+        ...DEFAULT_SETTINGS,
+        budgetDollars,
+        strategy: tier0 ? 'tier0' : 'auto',
+      }
+      setCommander(cmd)
+      setSettings(next)
+      await brewWith(cmd, next)
+    } catch (err) {
+      setBusy(false)
+      setError(
+        err instanceof RequestError ? err.message : 'Could not load the example.',
+      )
+    }
+  }
+
   return (
     <div className="app">
       <header className="app-header">
         <h1>EDH Budget Brewer</h1>
-        <nav>
-          <button
-            className={tab === 'brew' ? 'tab on' : 'tab'}
-            onClick={() => setTab('brew')}
-          >
-            Brew
-          </button>
-          <button
-            className={tab === 'collection' ? 'tab on' : 'tab'}
-            onClick={() => setTab('collection')}
-          >
-            Collection
-          </button>
-        </nav>
+        {demoMode === false && (
+          <nav>
+            <button
+              className={tab === 'brew' ? 'tab on' : 'tab'}
+              onClick={() => setTab('brew')}
+            >
+              Brew
+            </button>
+            <button
+              className={tab === 'collection' ? 'tab on' : 'tab'}
+              onClick={() => setTab('collection')}
+            >
+              Collection
+            </button>
+          </nav>
+        )}
       </header>
 
-      {tab === 'collection' ? (
+      {tab === 'collection' && demoMode === false ? (
         <main className="single">
           <CollectionPanel />
         </main>
@@ -92,6 +189,7 @@ export default function App() {
               onSettingsChange={setSettings}
               onSubmit={submit}
               busy={busy}
+              demoMode={demoMode !== false}
             />
           </aside>
 
@@ -119,15 +217,7 @@ export default function App() {
             )}
 
             {!error && !result && !busy && (
-              <div className="empty">
-                <p>Pick a commander and a budget to generate a deck.</p>
-                <p className="muted small">
-                  Decks are built to be legal and playable at the price you set:
-                  a real mana base, enough ramp and interaction, and a sane
-                  curve. Expect to land around 80% of the way there and edit
-                  from that starting point.
-                </p>
-              </div>
+              <Landing onExample={runExample} busy={busy} />
             )}
 
             {result && (
@@ -141,6 +231,8 @@ export default function App() {
           </section>
         </main>
       )}
+
+      <Footer demoMode={demoMode !== false} />
     </div>
   )
 }

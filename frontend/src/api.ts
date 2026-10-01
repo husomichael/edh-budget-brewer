@@ -1,4 +1,5 @@
 import type {
+  AppConfig,
   Brew,
   BrewRequest,
   Commander,
@@ -57,6 +58,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return response.json() as Promise<T>
+}
+
+export function getConfig() {
+  return request<AppConfig>('/api/config/')
+}
+
+/** Resolve a share-URL slug. Throws RequestError with a message on 404. */
+export function getCommanderBySlug(slug: string) {
+  return request<Commander>(`/api/commanders/${encodeURIComponent(slug)}/`)
 }
 
 export function searchCommanders(query: string, signal?: AbortSignal) {

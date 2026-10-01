@@ -29,6 +29,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from cards.models import Card
+from cards.slugs import card_slug
 
 # Layouts that are not real playable cards.
 EXCLUDED_LAYOUTS = {
@@ -49,6 +50,7 @@ EXCLUDED_SET_TYPES = {"memorabilia", "token"}
 UPDATE_FIELDS = [
     "scryfall_id",
     "name",
+    "slug",
     "mana_cost",
     "cmc",
     "type_line",
@@ -276,10 +278,13 @@ class Command(BaseCommand):
 
         commander_legality = (raw.get("legalities") or {}).get("commander", "not_legal")
 
+        name = raw["name"][:300]
+
         return Card(
             oracle_id=raw["oracle_id"],
             scryfall_id=raw["id"],
-            name=raw["name"][:300],
+            name=name,
+            slug=card_slug(name),
             mana_cost=(mana_cost or "")[:100],
             cmc=Decimal(str(raw.get("cmc", 0) or 0)),
             type_line=type_line[:300],

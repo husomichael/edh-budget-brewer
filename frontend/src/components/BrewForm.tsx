@@ -16,6 +16,8 @@ interface Props {
   onSettingsChange: (settings: BrewSettings) => void
   onSubmit: () => void
   busy: boolean
+  /** Read-only deployment: there is no collection to price against. */
+  demoMode: boolean
 }
 
 const PRESETS = [25, 50, 100, 200, 500]
@@ -27,6 +29,7 @@ export function BrewForm({
   onSettingsChange,
   onSubmit,
   busy,
+  demoMode,
 }: Props) {
   function update<K extends keyof BrewSettings>(key: K, value: BrewSettings[K]) {
     onSettingsChange({ ...settings, [key]: value })
@@ -105,19 +108,22 @@ export function BrewForm({
           </span>
         </label>
 
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={settings.ownedFree}
-            onChange={(e) => update('ownedFree', e.target.checked)}
-          />
-          <span>
-            Cards I own are free
-            <span className="muted small">
-              Budget becomes new money to spend rather than total retail value.
+        {!demoMode && (
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={settings.ownedFree}
+              onChange={(e) => update('ownedFree', e.target.checked)}
+            />
+            <span>
+              Cards I own are free
+              <span className="muted small">
+                Budget becomes new money to spend rather than total retail
+                value.
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
+        )}
 
         <label className="check">
           <input

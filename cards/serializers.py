@@ -18,6 +18,7 @@ class CommanderSerializer(serializers.ModelSerializer):
         model = Card
         fields = [
             "oracle_id",
+            "slug",
             "name",
             "type_line",
             "color_identity",

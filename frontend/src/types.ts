@@ -1,6 +1,12 @@
 // Mirrors the API's wire format. Worth keeping typed: the brew response is
 // nontrivial and will keep changing as the optimizer evolves.
 
+/** Runtime flags from /api/config/. One bundle serves local and demo. */
+export interface AppConfig {
+  /** Read-only public deployment: no collection, no saved decks. */
+  demo_mode: boolean
+}
+
 export type Role =
   | 'ramp'
   | 'draw'
@@ -15,6 +21,8 @@ export type Role =
 
 export interface Commander {
   oracle_id: string
+  /** Slugified name, used as the stable identifier in share URLs. */
+  slug: string
   name: string
   type_line: string
   color_identity: string[]
@@ -84,6 +92,12 @@ export interface Brew {
   spells: DeckCard[]
   lands: DeckCard[]
   text_decklist: string
+  /**
+   * ISO timestamp of when this deck was priced. A cached or shared result
+   * keeps the timestamp of the solve that produced it, so the UI can be
+   * honest about prices having moved rather than implying they are current.
+   */
+  priced_at: string
   upgrade_path?: UpgradePath
 }
 

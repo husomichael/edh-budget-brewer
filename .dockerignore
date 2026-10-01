@@ -1,0 +1,39 @@
+# Keep the build context small and the image free of host-specific state.
+
+# Virtualenvs and installed packages: the image installs its own.
+.venv/
+venv/
+node_modules/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Built artifacts. The image builds the frontend itself, so shipping a local
+# dist/ in would let a stale build win over a fresh one.
+frontend/dist/
+staticfiles/
+build/
+.vite/
+
+# Scryfall bulk data: ~25MB that changes daily and is loaded by the bootstrap
+# command at runtime (#26), not baked into a layer.
+data/
+
+# Secrets. .env holds a real SECRET_KEY and DATABASE_URL; it must never be
+# copied into an image that gets pushed to a registry.
+.env
+.env.*
+
+# History and tooling noise.
+.git/
+.github/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.DS_Store
+*.swp
+
+# Docs are not needed at runtime.
+*.md

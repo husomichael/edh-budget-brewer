@@ -32,6 +32,13 @@ class Card(models.Model):
     scryfall_id = models.UUIDField()
 
     name = models.CharField(max_length=300, db_index=True)
+
+    # Slugified name, for readable share URLs (#21). Not unique: slugs are
+    # derived from names, and nothing stops two printings from reducing to the
+    # same string. Resolution picks a winner deterministically instead --
+    # see cards.slugs.resolve_commander_slug. Indexed because that lookup is
+    # on the critical path of loading a shared link.
+    slug = models.SlugField(max_length=320, blank=True, db_index=True)
     mana_cost = models.CharField(max_length=100, blank=True)
     # Wide enough for Un-set absurdities: Gleemax costs {1000000}, so a
     # 5-digit field overflows on a real card in the bulk data.

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ROLE_ORDER, dollars, roleLabel } from '../format'
+import { ROLE_ORDER, dollars, pricedLabel, roleLabel } from '../format'
 import type { Brew, DeckCard } from '../types'
 import { CardRow } from './CardRow'
 import { ManaCurve } from './ManaCurve'
@@ -29,6 +29,15 @@ export function DeckResults({ brew }: { brew: Brew }) {
           <h2>{brew.commander.name}</h2>
           <p className="muted">
             {brew.card_count} cards &middot; {landCount} lands
+            {pricedLabel(brew.priced_at) && (
+              <>
+                {' '}
+                &middot;{' '}
+                <span title="Prices come from Scryfall and are refreshed nightly. Indicative only — your local market will differ.">
+                  {pricedLabel(brew.priced_at)}
+                </span>
+              </>
+            )}
           </p>
         </div>
         <button type="button" className="primary" onClick={copy}>

@@ -1,0 +1,105 @@
+# Render blueprint: one web service, one managed Postgres, one nightly cron.
+#
+# Create it with Render's "New Blueprint" flow pointed at this repo. The two
+# `sync: false` vars below are prompted for at creation time, because they
+# depend on the hostname Render assigns and so cannot be known in advance.
+#
+# See DEPLOY.md for the full runbook, including the one-off bootstrap step
+# that this file deliberately does not do.
+
+databases:
+  - name: edh-budget-brewer-db
+    databaseName: edh_budget_brewer
+    user: ebb
+    # Postgres is required, not a preference: the colour-identity filter uses
+    # the array containment operator against a GIN index.
+    #
+    # 256MB is ample. The whole dataset is ~34.5k rows, and the working set is
+    # the GIN index rather than the table.
+    plan: 0.1c-256mb
+    postgresMajorVersion: "16"
+    region: oregon
+
+services:
+  - type: web
+    name: edh-budget-brewer
+    runtime: docker
+    region: oregon
+    # Memory, not CPU, is the binding constraint: a five-colour brew loads
+    # ~24k candidate rows and peaks around 50MB per worker. 512MB holds two
+    # workers with room to spare.
+    plan: 0.5c-512mb
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    # migrate only. The full bootstrap downloads ~25MB from Scryfall and takes
+    # about a minute, which is too long to hold up every deploy -- and it only
+    # needs to happen once per environment. Run it from the Shell instead;
+    # DEPLOY.md step 5.
+    preDeployCommand: python manage.py migrate --noinput
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: edh-budget-brewer-db
+          property: connectionString
+      - key: DEBUG
+        value: "False"
+      # The public deployment is a read-only showcase: no accounts, no
+      # collection, no saved decks. See issue #20 and the README.
+      - key: DEMO_MODE
+        value: "True"
+      # Render terminates TLS in front of the app, so this also turns on
+      # SECURE_PROXY_SSL_HEADER. Without that, SECURE_SSL_REDIRECT loops.
+      - key: HTTPS_ONLY
+        value: "True"
+      - key: WEB_CONCURRENCY
+        value: "2"
+      # Cache and rate limits. Explicit rather than left to defaults, because
+      # these are the two knobs worth turning if the demo gets traffic.
+      #
+      # NOTE: locmem is per-process, so with 2 workers there are two
+      # independent throttle counters and the real limit is ~40/min. Set
+      # CACHE_URL to a Redis instance to make it exact and to share the brew
+      # cache between workers.
+      - key: BREW_CACHE_SECONDS
+        value: "86400"
+      - key: BREW_THROTTLE_RATE
+        value: 20/min
+      - key: READ_THROTTLE_RATE
+        value: 120/min
+      # Scryfall requires a descriptive User-Agent identifying the app.
+      - key: SCRYFALL_USER_AGENT
+        value: edh-budget-brewer/0.1 (+https://github.com/husomichael/edh-budget-brewer)
+      # Both depend on the hostname Render assigns, so they are prompted for
+      # at blueprint creation rather than guessed here.
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+
+  - type: cron
+    name: edh-budget-brewer-refresh
+    runtime: docker
+    region: oregon
+    plan: 0.5c-512mb
+    # 10:00 UTC daily, after Scryfall's own daily bulk rebuild. Prices move
+    # every day, which is exactly why DeckCard.price_at_generation exists.
+    schedule: "0 10 * * *"
+    dockerfilePath: ./Dockerfile
+    # --refresh skips migrate and sync_catalogs: the schema and the type
+    # catalogs are already in place, so this is prices and roles only.
+    dockerCommand: python manage.py bootstrap --refresh
+    envVars:
+      # Not shared with the web service on purpose. This process serves no
+      # requests and signs nothing, so the two keys never need to match.
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: edh-budget-brewer-db
+          property: connectionString
+      - key: DEBUG
+        value: "False"
+      - key: SCRYFALL_USER_AGENT
+        value: edh-budget-brewer/0.1 (+https://github.com/husomichael/edh-budget-brewer)

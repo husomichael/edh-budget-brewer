@@ -259,22 +259,102 @@ your commander and infer that your specific build wants sacrifice outlets over
 ## API
 
 ```
+GET  /api/config/                runtime feature flags
 GET  /api/commanders/?q=         commander autocomplete
 GET  /api/cards/ , /api/cards/<oracle_id>/
 POST /api/brew/                  generate a deck
-POST /api/brew/save/             generate and persist
-GET  /api/decks/ , /api/decks/<id>/
-GET  /api/collection/
-POST /api/collection/import/     paste a collection list
+POST /api/brew/save/             generate and persist        | local only
+GET  /api/decks/ , /api/decks/<id>/                          | local only
+GET  /api/collection/ , DELETE /api/collection/<id>/         | local only
+POST /api/collection/import/     paste a collection list     | local only
 ```
 
 `POST /api/brew/` is deterministic — identical input always returns an
 identical deck. An infeasible budget returns `400` carrying `minimum_cents`,
 so a client can offer to raise the budget rather than just reporting failure.
 
-The API is open (`AllowAny`) because this is a single-user local tool. **Do not
-deploy it as-is** — an open write API would let anyone edit the collection and
-decks.
+That determinism is what makes the response cacheable. Brews are cached for
+24h on the full determinism key — commander, budget, strategy, land count and
+whether an upgrade path was asked for — which turns a repeat request from
+0.39s into 0.002s. The TTL is capped at a day because Scryfall prices move
+daily. Rate limits are scoped: `20/min` for brewing, `120/min` for reads,
+since a five-colour brew with an upgrade path is ~1.1s of CPU while
+autocomplete is a single indexed query. Exceeding either returns `429`.
+
+### Demo mode
+
+There are no accounts, so the API is open (`AllowAny`). That is safe in two
+configurations and no others:
+
+| | |
+|---|---|
+| `DEMO_MODE=False` | the local tool — write endpoints exist, bound to localhost |
+| `DEMO_MODE=True` | a public read-only showcase — the write endpoints do not exist |
+
+With `DEMO_MODE=True`, the routes marked *local only* above and the Django
+admin are **not registered**, so they return `404` rather than `403` — the
+demo does not advertise functionality it refuses. `GET /api/config/` reports
+the flag, so one built frontend bundle serves both: the UI hides the
+Collection tab and the "cards I own are free" option when demo mode is on.
+
+Saved decks and collection tracking live in the
+[CLI](https://github.com/husomichael/edh-budget-brewer-cli), which is where
+per-user state actually makes sense.
+
+## Share URLs
+
+A generated deck is shareable as a plain link, with nothing stored server-side:
+
+```
+/?commander=krenko-mob-boss&budget=75&strategy=tier1&lands=36
+```
+
+This works only because the solver is deterministic — the same input returns a
+byte-identical list, so the parameters *are* the deck. No row, no id, no
+expiry. Opening the link resolves the slug server-side and re-runs the brew.
+The URL is kept in sync with `history.replaceState`, so tweaking the budget
+does not fill the back button with every intermediate value.
+
+Slugs come from the full card name, never a prefix: `Krenko, Mob Boss` and
+`Krenko, Tin Street Kingpin` must not collide, and as `krenko-mob-boss` and
+`krenko-tin-street-kingpin` they do not. All 3,441 commander-legal cards
+currently produce distinct slugs.
+
+Prices move daily, so a link shared months ago may solve slightly differently
+today. That is honest rather than broken, and the result says when it was
+priced.
+
+## Image hosting
+
+**Decision: keep pointing at Scryfall's CDN, lazily.** Scryfall ask projects
+doing bulk work to use their bulk data rather than hotlinking at scale, so
+this was worth measuring rather than assuming.
+
+The card image is only requested on hover, because the `<img>` element is not
+rendered until then — stronger than `loading="lazy"`, which still fetches
+eventually. Measured on a rendered 100-card deck: **one** Scryfall image
+request, for the commander portrait in the sidebar. Hovering a card adds
+exactly one more.
+
+So a page view costs ~1 image, not ~100, and proxying would trade a CDN
+problem for a storage and bandwidth problem on a 512MB instance. Worth
+revisiting if traffic ever becomes non-trivial.
+
+## Deploying
+
+The app runs as a single container: Node builds the React frontend, Django
+serves it through WhiteNoise alongside the API, and gunicorn fronts it.
+[`render.yaml`](render.yaml) declares a web service, a managed Postgres, and a
+nightly price-refresh cron job.
+
+```bash
+manage.py bootstrap            # empty environment -> serving brews
+manage.py bootstrap --refresh  # nightly: prices and roles only
+```
+
+A fresh environment has an empty card table and every brew returns
+`infeasible_budget` until `bootstrap` has run. **[DEPLOY.md](DEPLOY.md) is the
+full runbook** — environment variables, first deploy, rollback, and cost.
 
 ## Related
 

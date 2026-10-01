@@ -56,5 +56,17 @@ jobs:
         # runtime errors much later. Catch it here instead.
         run: python manage.py makemigrations --check --dry-run
 
+      - name: Check deployment settings
+        # Runs with the production env rather than the job's, so this checks
+        # the settings a deploy would actually use. --fail-level WARNING is
+        # the point: check --deploy exits 0 on warnings by default, so without
+        # it this step can never fail.
+        env:
+          DEBUG: "False"
+          HTTPS_ONLY: "True"
+          ALLOWED_HOSTS: demo.example.com
+          CSRF_TRUSTED_ORIGINS: https://demo.example.com
+        run: python manage.py check --deploy --fail-level WARNING
+
       - name: Test
         run: pytest --cov=cards --cov-report=term-missing

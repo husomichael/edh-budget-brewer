@@ -253,3 +253,44 @@ label { display: block; font-weight: 600; font-size: .85rem; margin-bottom: .3re
   margin: .4rem 0 0; padding-left: 1.2rem;
   font-family: ui-monospace, monospace; font-size: .8rem; color: var(--warn);
 }
+
+/* --- Landing content (#28) ------------------------------------------------ */
+
+.landing {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; padding: 1.75rem;
+}
+.landing h2 {
+  margin: 0 0 .75rem; font-size: 1.4rem; line-height: 1.3;
+}
+.landing h3 {
+  margin: 1.5rem 0 .4rem; font-size: .95rem;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+}
+.landing p { margin: 0 0 .5rem; line-height: 1.55; }
+
+.examples { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .6rem; }
+.examples button {
+  /* Override button.primary's width:100% so the two sit side by side, and
+     let them stack on a narrow screen rather than overflowing. */
+  flex: 1 1 15rem; width: auto;
+  display: flex; flex-direction: column; gap: .15rem;
+  align-items: flex-start; text-align: left; padding: .7rem .9rem;
+}
+.examples button.secondary {
+  background: var(--panel-2); border-color: var(--line); color: var(--text);
+  font-weight: 600;
+}
+.examples .muted { font-weight: 400; }
+.examples button.primary .muted { color: #11131a; opacity: .7; }
+
+/* --- Footer: attribution and legal (#27) --------------------------------- */
+
+.app-footer {
+  margin-top: 2.5rem; padding: 1.25rem 0 2rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted); font-size: .8rem; line-height: 1.55;
+}
+.app-footer p { margin: 0 0 .6rem; max-width: 70ch; }
+.app-footer a { color: var(--accent); }
+.app-footer .legal { font-size: .75rem; opacity: .8; }

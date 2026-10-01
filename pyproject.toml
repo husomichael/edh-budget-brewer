@@ -11,6 +11,10 @@ dependencies = [
     # macOS python.org builds do not use the system cert store; the Scryfall
     # sync points OpenSSL at certifi's bundle explicitly.
     "certifi",
+    # Serves the built frontend and Django's own static files from the app
+    # process, so the deployment is one service with no CDN to configure.
+    "whitenoise>=6.9",
+    "gunicorn>=23.0",
 ]
 
 [project.optional-dependencies]
@@ -36,4 +40,4 @@ select = ["E", "F", "I", "UP", "B", "DJ"]
 DJANGO_SETTINGS_MODULE = "config.settings"
 python_files = ["test_*.py"]
 addopts = "--reuse-db -q"
-testpaths = ["cards/tests"]
+testpaths = ["cards/tests", "config/tests"]

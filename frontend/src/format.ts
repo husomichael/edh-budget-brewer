@@ -32,3 +32,28 @@ export function colorIdentityLabel(identity: string[]): string {
   if (identity.length === 0) return 'Colorless'
   return identity.map((c) => COLOR_NAMES[c] ?? c).join(' / ')
 }
+
+/**
+ * When this deck was priced.
+ *
+ * Prices move daily and a brew response can be cached for 24h or arrive via
+ * a share URL solved months ago, so the result has to say how old it is
+ * rather than implying it is current.
+ */
+export function pricedLabel(iso: string | undefined): string {
+  if (!iso) return ''
+  const then = new Date(iso)
+  if (Number.isNaN(then.getTime())) return ''
+
+  const now = new Date()
+  if (then.toDateString() === now.toDateString()) return 'priced today'
+
+  const days = Math.floor((now.getTime() - then.getTime()) / 86_400_000)
+  if (days <= 1) return 'priced yesterday'
+  if (days < 30) return `priced ${days} days ago`
+  return `priced ${then.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })}`
+}
