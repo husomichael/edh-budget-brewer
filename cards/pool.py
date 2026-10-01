@@ -22,6 +22,7 @@ POOL_FIELDS = (
     "cmc",
     "mana_cost",
     "type_line",
+    "oracle_text",
     "primary_role",
     "secondary_role",
     "edhrec_rank",

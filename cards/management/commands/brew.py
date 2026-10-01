@@ -12,7 +12,9 @@ from django.core.management.base import BaseCommand, CommandError
 
 from cards.models import Card
 from cards.pool import build_pool
+from cards.scoring import Tier0PopularityStrategy
 from cards.solver import DEFAULT_LAND_COUNT, InfeasibleBudget, brew
+from cards.tier1 import Tier1SynergyStrategy
 
 ROLE_ORDER = [
     "ramp",
@@ -45,6 +47,15 @@ class Command(BaseCommand):
             help=f"Target land count (default {DEFAULT_LAND_COUNT}).",
         )
         parser.add_argument(
+            "--strategy",
+            choices=["auto", "tier0", "tier1"],
+            default="auto",
+            help=(
+                "Scoring strategy. auto (default) uses tier1 commander-text "
+                "synergy; tier0 is pure popularity."
+            ),
+        )
+        parser.add_argument(
             "--format",
             choices=["table", "text", "json"],
             default="table",
@@ -55,7 +66,12 @@ class Command(BaseCommand):
         commander = self._resolve_commander(options["commander"])
         budget_cents = int(round(options["budget"] * 100))
 
-        pool = build_pool(commander)
+        strategy = (
+            Tier0PopularityStrategy()
+            if options["strategy"] == "tier0"
+            else Tier1SynergyStrategy()
+        )
+        pool = build_pool(commander, strategy=strategy)
         try:
             result = brew(pool, budget_cents, land_count=options["lands"])
         except InfeasibleBudget as exc:
@@ -131,7 +147,7 @@ class Command(BaseCommand):
         w(f"Cards: {r.card_count}")
         w("Curve: " + "  ".join(f"{k}:{v}" for k, v in r.curve.items()))
         w(f"Scoring: {r.tier_label} (tier {r.tier})")
-        if r.tier == 0:
+        if r.tier == 0 or "no themes" in r.tier_label:
             w(
                 "  Note: tier 0 ranks by global EDH popularity, so this deck is "
                 "in the right\n  colors but is not synergy-aware for this "

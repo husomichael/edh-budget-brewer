@@ -170,7 +170,9 @@ def brew(pool, budget_cents, quotas=None, land_count=DEFAULT_LAND_COUNT):
     )
 
     # --- spend what is left on the best available upgrades ----------------
-    chosen, spent = _upgrade(spells_available, chosen, spent, spell_budget)
+    chosen, spent = _upgrade(
+        spells_available, chosen, spent, spell_budget, quotas
+    )
 
     # --- pass 2: rebuild the mana base now that pips are known ------------
     # The first pass had to guess at color weights because no spells existed
@@ -299,7 +301,38 @@ def _fill_remainder(spells, chosen, spent, counts, quotas, slots, spell_budget):
     return chosen, spent, counts
 
 
-def _upgrade(spells, chosen, spent, spell_budget):
+def _coverage_of(cards):
+    """How many of `cards` cover each role, counting secondary roles."""
+    coverage = {}
+    for cand in cards:
+        for role in (cand.primary_role, cand.secondary_role):
+            if role:
+                coverage[role] = coverage.get(role, 0) + 1
+    return coverage
+
+
+def _swap_keeps_floors(outgoing, incoming, coverage, quotas):
+    """Whether replacing `outgoing` with `incoming` keeps every floor met.
+
+    Swapping within a primary role preserves primary-role counts, but a card
+    can also be the only thing covering a *secondary* role. Hedron Alignment
+    is primary=protection, secondary=wincon; upgrading it to a better
+    protection card silently dropped the deck's only win condition. So each
+    swap has to be checked against coverage, not just counts.
+    """
+    incoming_roles = {incoming.primary_role, incoming.secondary_role}
+    for role in (outgoing.primary_role, outgoing.secondary_role):
+        if not role:
+            continue
+        after = coverage.get(role, 0) - 1
+        if role in incoming_roles:
+            after += 1
+        if after < quotas.get(role, (0, 99))[0]:
+            return False
+    return True
+
+
+def _upgrade(spells, chosen, spent, spell_budget, quotas):
     """Spend the remaining budget on the best available upgrades.
 
     Swaps are ranked by **score gained per dollar spent**, not by "best card I
@@ -320,6 +353,8 @@ def _upgrade(spells, chosen, spent, spell_budget):
         # Cards far down the score order cannot beat anything already chosen,
         # so bounding the scan keeps swap enumeration cheap.
         del by_role[role][CANDIDATES_PER_ROLE:]
+
+    coverage = _coverage_of(chosen.values())
 
     for _ in range(MAX_UPGRADE_PASSES):
         swaps = []
@@ -350,9 +385,18 @@ def _upgrade(spells, chosen, spent, spell_budget):
                 continue
             if spent + cost > spell_budget:
                 continue
-            outgoing = chosen.pop(out_id)
+            outgoing = chosen[out_id]
+            if not _swap_keeps_floors(outgoing, cand, coverage, quotas):
+                continue
+            del chosen[out_id]
             spent += cand.price_cents - outgoing.price_cents
             chosen[cand.oracle_id] = cand
+            for role in (outgoing.primary_role, outgoing.secondary_role):
+                if role:
+                    coverage[role] -= 1
+            for role in (cand.primary_role, cand.secondary_role):
+                if role:
+                    coverage[role] = coverage.get(role, 0) + 1
             applied += 1
 
         if applied == 0:

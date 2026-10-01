@@ -13,9 +13,9 @@ interaction, and a reasonable curve.
 **It generates decks.** `manage.py brew` produces a complete, legal, 100-card
 Commander deck within a dollar budget in well under a second.
 
-Working: Scryfall sync, role classification, Tier 0 scoring, candidate pool,
-mana base, the knapsack solver, and the CLI. Not yet built: Tier 1 synergy
-inference, the upgrade path, the API, and the frontend. See the
+Working: Scryfall sync, role classification, Tier 0 and Tier 1 scoring, the
+candidate pool, mana base, the knapsack solver, and the CLI. Not yet built:
+Tier 2 paste import, the upgrade path, the API, and the frontend. See the
 [issues](https://github.com/husomichael/edh-budget-brewer/issues).
 
 ### Try it
@@ -140,11 +140,31 @@ anyone's data but Scryfall's.
 | 2 | EDHREC percentages pasted in by the user, per commander | one commander, on demand | crowd-validated |
 
 **Tier 1 is the default** and needs no input beyond the commander's name. A
-commander's rules text usually states what the deck wants — Krenko says
-"Goblin", Muldrotha says "graveyard", Omnath says "land" — and that text is
-already in the local database. It works well for tribal and mechanic-themed
-commanders, poorly for abstract value commanders, and not at all for combo
-commanders whose decks are crowd knowledge rather than card text.
+commander's rules text usually states what the deck wants, and that text is
+already in the local database. Measured against Tier 0 on the same commander
+and budget:
+
+| Commander | Themes detected | On-theme cards, tier 0 → tier 1 |
+|---|---|---|
+| Krenko, Mob Boss | Goblin, tokens | 4 → **52** goblins |
+| Muldrotha, the Gravetide | graveyard | 6 → **61** graveyard cards |
+| Atraxa, Praetors' Voice | counters | 8 → **62** counters cards |
+| Talrand, Sky Summoner | spellslinger, tokens, Drake | 9 → **50** token cards |
+
+Better still, the role quotas get filled *by on-theme cards*: a Tier 1 Krenko
+deck ramps with Impulsive Pilferer, draws with Dark-Dweller Oracle, removes
+with Siege-Gang Commander, and recurs with Squee — all Goblins. That is how the
+deck is actually built in practice.
+
+A bare subtype on the type line is treated as flavor, not a plan. Muldrotha is
+an "Elemental Avatar" but is a graveyard deck; Atraxa is a "Phyrexian Angel
+Horror" but is a counters deck. What marks a type as a real tribal theme is the
+commander's *rules text* naming it too.
+
+It works well for tribal and mechanic-themed commanders, poorly for abstract
+value commanders (where it falls back to pure popularity rather than building
+from near-zero theme scores), and not at all for combo commanders whose decks
+are crowd knowledge rather than card text.
 
 **Tier 2** is optional polish for those weak cases. Generated decks always
 report which tier produced them.
