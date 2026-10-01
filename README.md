@@ -14,8 +14,9 @@ interaction, and a reasonable curve.
 Commander deck within a dollar budget in well under a second.
 
 Working: Scryfall sync, role classification, Tier 0 and Tier 1 scoring, the
-candidate pool, mana base, the knapsack solver, and the CLI. Not yet built:
-Tier 2 paste import, the upgrade path, the API, and the frontend. See the
+candidate pool, mana base, the knapsack solver, deck/collection storage,
+own-it-already pricing, the marginal upgrade path, and the CLI. Not yet built:
+Tier 2 paste import, the API, and the frontend. See the
 [issues](https://github.com/husomichael/edh-budget-brewer/issues).
 
 ### Try it
@@ -24,6 +25,10 @@ Tier 2 paste import, the upgrade path, the API, and the frontend. See the
 manage.py brew "Krenko, Mob Boss" --budget 75
 manage.py brew "Muldrotha, the Gravetide" --budget 200 --format text
 manage.py brew "Atraxa, Praetors' Voice" --budget 150 --format json
+
+manage.py brew "Krenko" --budget 50 --upgrade-path   # what the next $25 buys
+manage.py brew "Edgar Markov" --budget 100 --owned-free   # collection is free
+manage.py brew "Talrand" --budget 60 --save --name "Budget Drakes"
 ```
 
 `--format text` emits `1 Card Name` per line, which pastes directly into
@@ -92,6 +97,64 @@ manage.py brew "<commander>" --budget <dollars> [--lands N] [--format FMT]
 
 Solves in ~25-500ms depending on color count. Exits with a clear error naming
 the real minimum if the budget cannot produce a legal deck.
+
+| Flag | Effect |
+|---|---|
+| `--budget` | Dollar target (required) |
+| `--strategy` | `auto` (tier 1, default), `tier0`, `tier1` |
+| `--upgrade-path` | Also show what the next budget increments would buy |
+| `--owned-free` | Price collection cards at $0 |
+| `--save` / `--name` | Persist the deck |
+| `--lands` | Target land count (default 36) |
+| `--format` | `table`, `text`, `json` |
+
+### The upgrade path
+
+`--upgrade-path` solves at `+$25`, `+$50`, `+$100`, `+$250`, and no limit, then
+diffs the results into an ordered purchase sequence. Each tier reports **dollars
+per point of score gained**, which makes diminishing returns visible:
+
+```
+Best next buys, cheapest first:
+  $   0.49  Hordeling Outburst
+  $   2.86  Goblin Spymaster
+  $   4.21  Brash Taunter
+
++$25  -> $74.57 spent, score 33.9 (+0.9)    $22.93 per point
++$50  -> $99.98 spent, score 34.1 (+0.2)   $121.36 per point
++$250 -> $297.54 spent, score 34.9 (+0.1)  $1269.30 per point
+```
+
+Deck selection is **not monotonic** — a tier with more money can differ by more
+than one card, because extra budget in one role enables a cheaper reshuffle in
+another. So each tier reports a *set* of changes rather than pretending to be a
+single-card chain.
+
+**A caveat on that metric.** Score is built from `edhrec_rank`, which is
+log-normalized and therefore compresses differences between top cards. The
+solver reports a $50 Krenko deck as ~94% as good as an unlimited one, which
+overstates how close they are: it cannot see that Kiki-Jiki is *qualitatively*
+different from a $1 goblin, only that their popularity ranks are not far apart.
+Treat the upgrade path as most trustworthy in the $0–100 range, where the gains
+are real and large.
+
+### Own-it-already pricing
+
+`--owned-free` prices cards in your collection at `$0`, so a budget means new
+money rather than retail value:
+
+```
+Total: $40.00 / $40.00 budget
+  new spend    $40.00
+  retail value $52.91
+  from collection: 7 cards
+  ! "Sol Ring" is owned but sleeved in "Krenko, Mob Boss ($75)" --
+    using it means taking that deck apart.
+```
+
+Owned cards that are currently in an **assembled** deck are still priced free
+but flagged, since using one means dismantling a deck that already exists.
+Surfacing the conflict beats deciding it silently.
 
 ## How it works
 

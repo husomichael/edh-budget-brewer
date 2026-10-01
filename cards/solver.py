@@ -85,7 +85,27 @@ class Brew:
 
     @property
     def total_cents(self):
+        """New money required. Equals retail unless own-it-already pricing."""
         return self.land_cents + self.spell_cents
+
+    @property
+    def retail_cents(self):
+        """What the deck would cost buying every card at retail."""
+        spells = sum(c.retail_cents for c in self.spells)
+        lands = sum(c.retail_cents * q for c, q in self.lands)
+        return spells + lands
+
+    @property
+    def owned_cards(self):
+        """Cards supplied from the collection rather than bought."""
+        return [c for c in self.spells if c.is_owned] + [
+            c for c, _ in self.lands if c.is_owned
+        ]
+
+    @property
+    def locked_cards(self):
+        """Owned cards that are currently sleeved in an assembled deck."""
+        return [c for c in self.owned_cards if c.locked_in]
 
     @property
     def card_count(self):
@@ -204,6 +224,11 @@ def brew(pool, budget_cents, quotas=None, land_count=DEFAULT_LAND_COUNT):
             f"Deck has {result.card_count} cards, expected {DECK_SIZE}."
         )
     _warn_unmet_floors(result, quotas)
+    for cand in result.locked_cards:
+        result.warnings.append(
+            f'"{cand.name}" is owned but sleeved in "{cand.locked_in}" -- '
+            f"using it means taking that deck apart."
+        )
     return result
 
 

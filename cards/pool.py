@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from django.db.models import Q
 
-from cards.models import Card
+from cards.models import Card, CollectionItem, Deck
 from cards.scoring import Tier0PopularityStrategy
 
 # Fields pulled from the database. Using .values() rather than model instances
@@ -38,7 +38,17 @@ class Candidate:
 
     oracle_id: str
     name: str
+    # What this card costs the user. 0 for basics and for owned cards under
+    # own-it-already pricing.
     price_cents: int
+    # What it costs at retail regardless of ownership, so output can show both
+    # "new spend" and "retail value".
+    retail_cents: int
+    is_owned: bool
+    # Name of an assembled deck already using this card, if any. An owned card
+    # that is sleeved up is not really free -- taking it means dismantling
+    # that deck -- so the conflict is surfaced rather than decided silently.
+    locked_in: str
     cmc: Decimal
     mana_cost: str
     type_line: str
@@ -67,6 +77,7 @@ class CandidatePool:
     candidates: list
     tier: int
     tier_label: str
+    owned_free: bool = False
 
     def __len__(self):
         return len(self.candidates)
@@ -124,40 +135,65 @@ def build_pool(commander, strategy=None, owned_free=False, partner=None):
     scored = strategy.score(rows, commander)
 
     owned = _owned_oracle_ids() if owned_free else set()
+    locked = _locked_oracle_ids() if owned_free else {}
 
-    candidates = [
-        Candidate(
-            oracle_id=str(row["oracle_id"]),
-            name=row["name"],
-            # Basic lands are free in practice and own-it-already pricing
-            # zeroes out cards already in the collection.
-            price_cents=0
-            if (row["is_basic"] or str(row["oracle_id"]) in owned)
-            else (row["price_cents"] or 0),
-            cmc=row["cmc"],
-            mana_cost=row["mana_cost"],
-            type_line=row["type_line"],
-            primary_role=row["primary_role"],
-            secondary_role=row["secondary_role"],
-            is_land=row["is_land"],
-            is_basic=row["is_basic"],
-            score=scored.scores.get(str(row["oracle_id"]), 0.0),
-        )
-        for row in rows
-    ]
+    candidates = [_make_candidate(row, scored, owned, locked) for row in rows]
 
     return CandidatePool(
         commander=commander,
         candidates=candidates,
         tier=scored.tier,
         tier_label=scored.label,
+        owned_free=owned_free,
+    )
+
+
+def _make_candidate(row, scored, owned, locked):
+    oracle_id = str(row["oracle_id"])
+    is_owned = oracle_id in owned
+    retail = row["price_cents"] or 0
+    return Candidate(
+        oracle_id=oracle_id,
+        name=row["name"],
+        # Basic lands are free in practice; own-it-already pricing zeroes out
+        # cards already in the collection.
+        price_cents=0 if (row["is_basic"] or is_owned) else retail,
+        retail_cents=retail,
+        is_owned=is_owned,
+        locked_in=locked.get(oracle_id, ""),
+        cmc=row["cmc"],
+        mana_cost=row["mana_cost"],
+        type_line=row["type_line"],
+        primary_role=row["primary_role"],
+        secondary_role=row["secondary_role"],
+        is_land=row["is_land"],
+        is_basic=row["is_basic"],
+        score=scored.scores.get(oracle_id, 0.0),
     )
 
 
 def _owned_oracle_ids():
-    """Oracle IDs of cards in the user's collection.
+    """Oracle IDs of every card in the user's collection."""
+    return {
+        str(oid)
+        for oid in CollectionItem.objects.values_list("card__oracle_id", flat=True)
+    }
 
-    Returns empty until CollectionItem lands in #4; wired here so own-it-already
-    pricing needs no change to the pool once that model exists.
+
+def _locked_oracle_ids():
+    """Owned cards currently sleeved in an assembled deck, mapped to its name.
+
+    Priced free like any owned card, but flagged, because using one means
+    taking apart a deck that already exists.
     """
-    return set()
+    rows = (
+        Deck.objects.filter(is_assembled=True)
+        .values_list("cards__card__oracle_id", "name")
+        .order_by("name")
+    )
+    locked = {}
+    for oracle_id, deck_name in rows:
+        if oracle_id is None:
+            continue
+        locked.setdefault(str(oracle_id), deck_name)
+    return locked

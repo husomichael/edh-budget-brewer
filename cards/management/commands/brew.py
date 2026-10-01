@@ -10,11 +10,13 @@ import json
 
 from django.core.management.base import BaseCommand, CommandError
 
+from cards.decks import save_brew
 from cards.models import Card
 from cards.pool import build_pool
 from cards.scoring import Tier0PopularityStrategy
 from cards.solver import DEFAULT_LAND_COUNT, InfeasibleBudget, brew
 from cards.tier1 import Tier1SynergyStrategy
+from cards.upgrades import upgrade_path
 
 ROLE_ORDER = [
     "ramp",
@@ -56,6 +58,29 @@ class Command(BaseCommand):
             ),
         )
         parser.add_argument(
+            "--upgrade-path",
+            action="store_true",
+            help="Also show what the next increments of budget would buy.",
+        )
+        parser.add_argument(
+            "--owned-free",
+            action="store_true",
+            help=(
+                "Price cards in your collection at $0, so the budget means "
+                "new money to spend rather than total retail value."
+            ),
+        )
+        parser.add_argument(
+            "--save",
+            action="store_true",
+            help="Persist the generated deck.",
+        )
+        parser.add_argument(
+            "--name",
+            default="",
+            help="Name for the saved deck (defaults to commander + budget).",
+        )
+        parser.add_argument(
             "--format",
             choices=["table", "text", "json"],
             default="table",
@@ -71,7 +96,9 @@ class Command(BaseCommand):
             if options["strategy"] == "tier0"
             else Tier1SynergyStrategy()
         )
-        pool = build_pool(commander, strategy=strategy)
+        pool = build_pool(
+            commander, strategy=strategy, owned_free=options["owned_free"]
+        )
         try:
             result = brew(pool, budget_cents, land_count=options["lands"])
         except InfeasibleBudget as exc:
@@ -83,6 +110,15 @@ class Command(BaseCommand):
             "json": self._render_json,
         }[options["format"]]
         renderer(result)
+
+        if options["upgrade_path"] and options["format"] == "table":
+            self._render_upgrade_path(pool, budget_cents)
+
+        if options["save"]:
+            deck = save_brew(result, name=options["name"] or None)
+            self.stdout.write(
+                self.style.SUCCESS(f'\nSaved as deck #{deck.pk}: "{deck.name}"')
+            )
 
     # -- commander lookup --------------------------------------------------
 
@@ -151,6 +187,10 @@ class Command(BaseCommand):
         )
         w(f"  lands  ${r.land_cents / 100:.2f}")
         w(f"  spells ${r.spell_cents / 100:.2f}")
+        if r.owned_cards:
+            w(f"  new spend    ${r.total_cents / 100:.2f}")
+            w(f"  retail value ${r.retail_cents / 100:.2f}")
+            w(f"  from collection: {len(r.owned_cards)} cards")
         w(f"Cards: {r.card_count}")
         w("Curve: " + "  ".join(f"{k}:{v}" for k, v in r.curve.items()))
         w(f"Scoring: {r.tier_label} (tier {r.tier})")
@@ -162,6 +202,38 @@ class Command(BaseCommand):
             )
         for warning in r.warnings:
             w(self.style.WARNING(f"  ! {warning}"))
+
+    def _render_upgrade_path(self, pool, budget_cents):
+        w = self.stdout.write
+        path = upgrade_path(pool, budget_cents)
+
+        w("")
+        w(self.style.MIGRATE_HEADING("=== UPGRADE PATH ==="))
+        w("")
+        best = path.best_next_buys
+        if best:
+            w("Best next buys, cheapest first:")
+            for cand in best[:8]:
+                w(f"  ${cand.price_cents / 100:>7.2f}  {cand.name}")
+            w("")
+
+        for step in path.steps:
+            tag = " (aspirational)" if step.is_no_limit else ""
+            w(
+                self.style.MIGRATE_LABEL(
+                    f"{step.label}{tag} -> ${step.total_cents / 100:.2f} spent, "
+                    f"score {step.score:.1f} ({step.score_delta:+.1f})"
+                )
+            )
+            value = step.cost_per_point
+            if value is not None:
+                w(f"  ${value:.2f} per point of score gained")
+            w(f"  {len(step.added)} cards in, {len(step.removed)} out")
+            for cand in step.added[:5]:
+                w(f"    + {cand.name[:38]:40} ${cand.price_cents / 100:>7.2f}")
+            if len(step.added) > 5:
+                w(f"    ... and {len(step.added) - 5} more")
+            w("")
 
     def _render_text(self, r):
         """Paste-ready decklist. Imports directly into Moxfield or Archidekt."""
