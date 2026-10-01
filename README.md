@@ -23,11 +23,11 @@ total synergy subject to a dollar budget *and* deck-construction quotas.
 Input: commander, budget B
 
 1. Resolve commander -> color identity, legality
-2. Candidate pool = EDHREC recommendations (cached locally), joined
-   against local Scryfall rows for price / cmc / type / oracle text
+2. Candidate pool = every commander-legal card, scored by the active
+   tier (see below), joined against local Scryfall rows for
+   price / cmc / type / oracle text
 3. Filter: commander-legal, color identity subset of commander's, not banned
-4. Score each card: blend of inclusion rate and synergy
-      (inclusion alone -> generic staples; synergy alone -> cute jank)
+4. Score each card via the active scoring tier, normalized to 0..1
 5. Classify into roles from type line + oracle text:
       land / ramp / draw / spot removal / sweeper / recursion /
       protection / wincon / synergy
@@ -49,6 +49,27 @@ tool provides.
 so "build me a $50 deck" means "the best deck for this commander using what I
 own plus $50 of new cards."
 
+### Scoring tiers
+
+Scoring is pluggable, so the tool works for any commander without requiring
+anyone's data but Scryfall's.
+
+| Tier | Source | Works for | Quality |
+|---|---|---|---|
+| 0 | `edhrec_rank` + color identity + role quotas | any commander | legal, playable, generic |
+| 1 | synergy inferred from the commander's own oracle text | any commander | thematically coherent |
+| 2 | EDHREC percentages pasted in by the user, per commander | one commander, on demand | crowd-validated |
+
+**Tier 1 is the default** and needs no input beyond the commander's name. A
+commander's rules text usually states what the deck wants — Krenko says
+"Goblin", Muldrotha says "graveyard", Omnath says "land" — and that text is
+already in the local database. It works well for tribal and mechanic-themed
+commanders, poorly for abstract value commanders, and not at all for combo
+commanders whose decks are crowd knowledge rather than card text.
+
+**Tier 2** is optional polish for those weak cases. Generated decks always
+report which tier produced them.
+
 ## Expectations
 
 Generated decks land roughly 80% of the way there. The optimizer cannot read
@@ -69,16 +90,18 @@ Scryfall is not affiliated with this project. Prices are provided by Scryfall
 and sourced from TCGplayer and Cardmarket; they are updated daily and are
 indicative only.
 
-Deck recommendation data comes from [**EDHREC**](https://edhrec.com). EDHREC
-does not publish a documented public API, and this project is not affiliated
-with or endorsed by them. Accordingly it:
+`edhrecRank` and `edhrecSaltiness` are also available from
+[**MTGJSON**](https://mtgjson.com), which is MIT licensed.
 
-- caches every response locally and refreshes no more than weekly,
-- rate-limits requests and sends an identifying `User-Agent`,
-- never redistributes or republishes their data,
-- degrades to Scryfall's `edhrec_rank` field if their endpoints change.
+**This project does not scrape EDHREC.** [EDHREC](https://edhrec.com) publishes
+no API and no data export, and their Terms of Use prohibit automated queries, so
+there is no sanctioned programmatic path to their data. The optimizer is
+therefore built on data this project is plainly licensed to use, and EDHREC
+participates only through Tier 2 below, where a user supplies data they fetched
+themselves in their own browser.
 
-This is a personal, non-commercial tool.
+This is a personal, non-commercial tool. It is not affiliated with or endorsed
+by Scryfall, EDHREC, Space Cow Media, or Wizards of the Coast.
 
 ## Legal
 

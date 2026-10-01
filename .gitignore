@@ -21,6 +21,10 @@ db.sqlite3
 /data/scryfall/
 *.json.gz
 
+# User-pasted EDHREC data. NEVER commit this - their terms grant no rights to
+# their content. Local and private is fine; republishing is not.
+/data/edhrec/
+
 # Node / React
 node_modules/
 dist/
