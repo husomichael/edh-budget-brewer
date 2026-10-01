@@ -9,6 +9,8 @@ from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 
+from cards.classification import ROLE_CHOICES, SYNERGY
+
 # Scryfall's WUBRG color codes.
 COLOR_CHOICES = [
     ("W", "White"),
@@ -77,6 +79,22 @@ class Card(models.Model):
     layout = models.CharField(max_length=40, blank=True)
     image_uri = models.URLField(max_length=500, blank=True)
 
+    # Functional role, assigned by `manage.py classify_cards`. Stored rather
+    # than computed so the candidate pool can filter and group on it in SQL.
+    # Kept out of sync_cards because classification rules get tuned often and
+    # re-downloading the bulk file to re-tune would be wasteful.
+    primary_role = models.CharField(
+        max_length=20, choices=ROLE_CHOICES, default=SYNERGY, db_index=True
+    )
+    secondary_role = models.CharField(
+        max_length=20, choices=ROLE_CHOICES, blank=True, default=""
+    )
+    role_source = models.CharField(
+        max_length=10,
+        default="",
+        help_text="'heuristic' or 'override' -- where this role came from.",
+    )
+
     synced_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -88,6 +106,9 @@ class Card(models.Model):
                 name="card_legal_rank_idx",
             ),
             models.Index(fields=["can_be_commander"], name="card_is_commander_idx"),
+            models.Index(
+                fields=["primary_role", "edhrec_rank"], name="card_role_rank_idx"
+            ),
         ]
         ordering = ["name"]
 
