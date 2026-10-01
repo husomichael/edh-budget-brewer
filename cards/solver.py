@@ -130,9 +130,7 @@ class Brew:
 
     @property
     def total_score(self):
-        return sum(c.score for c in self.spells) + sum(
-            c.score for c, _ in self.lands
-        )
+        return sum(c.score for c in self.spells) + sum(c.score for c, _ in self.lands)
 
 
 def brew(pool, budget_cents, quotas=None, land_count=DEFAULT_LAND_COUNT):
@@ -170,9 +168,7 @@ def brew(pool, budget_cents, quotas=None, land_count=DEFAULT_LAND_COUNT):
     )
 
     # --- spend what is left on the best available upgrades ----------------
-    chosen, spent = _upgrade(
-        spells_available, chosen, spent, spell_budget, quotas
-    )
+    chosen, spent = _upgrade(spells_available, chosen, spent, spell_budget, quotas)
 
     # --- pass 2: rebuild the mana base now that pips are known ------------
     # The first pass had to guess at color weights because no spells existed
@@ -191,7 +187,9 @@ def brew(pool, budget_cents, quotas=None, land_count=DEFAULT_LAND_COUNT):
 
     result = Brew(
         commander=pool.commander,
-        lands=sorted(mana.lands, key=lambda lq: (lq[0].is_basic, -lq[0].score, lq[0].name)),
+        lands=sorted(
+            mana.lands, key=lambda lq: (lq[0].is_basic, -lq[0].score, lq[0].name)
+        ),
         spells=spells,
         budget_cents=budget_cents,
         land_cents=mana.total_cents,
@@ -249,7 +247,7 @@ def _fill_floors(pool, quotas, slots, spell_budget):
     primary_counts = {}
     spent = 0
 
-    for role, (floor, ceiling) in quotas.items():
+    for role, (floor, _) in quotas.items():
         if floor <= 0:
             continue
         # filling_role() accepts secondary roles too, so a card that ramps and

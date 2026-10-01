@@ -4,7 +4,7 @@ import uuid
 
 from django.test import TestCase
 
-from cards.classification import LAND, RAMP, SYNERGY
+from cards.classification import LAND, SYNERGY
 from cards.manabase import (
     MAX_NONBASIC_FRACTION,
     build_mana_base,
@@ -154,9 +154,7 @@ class BuildManaBaseTests(TestCase):
             edhrec_rank=1,
         )
         mana = build_mana_base(build_pool(self.commander), budget_cents=5000)
-        self.assertNotIn(
-            "Snow-Covered Mountain", [c.name for c, _ in mana.lands]
-        )
+        self.assertNotIn("Snow-Covered Mountain", [c.name for c, _ in mana.lands])
 
     def test_nonbasic_count_is_capped(self):
         make_basics("R")

@@ -288,8 +288,7 @@ class Tier1SynergyStrategy:
         if not self.themes:
             return ScoredPool(
                 scores={
-                    str(c["oracle_id"]): normalize_rank(c["edhrec_rank"])
-                    for c in cards
+                    str(c["oracle_id"]): normalize_rank(c["edhrec_rank"]) for c in cards
                 },
                 tier=self.tier,
                 label=f"{self.label} - no themes detected, using popularity",

@@ -91,9 +91,7 @@ class SolverTests(TestCase):
     def test_stays_within_budget(self):
         for budget in (2_000, 5_000, 20_000):
             result = self._brew(budget)
-            self.assertLessEqual(
-                result.total_cents, budget, f"over budget at {budget}"
-            )
+            self.assertLessEqual(result.total_cents, budget, f"over budget at {budget}")
 
     def test_is_deterministic(self):
         """Identical inputs must produce byte-identical decks."""

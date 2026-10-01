@@ -211,9 +211,7 @@ class Tier1StrategyTests(TestCase):
     def test_falls_back_to_popularity_when_no_themes(self):
         """An abstract commander should get a popularity deck, not a deck
         built from uniformly near-zero theme scores."""
-        vanilla = self._commander(
-            type_line="Legendary Creature — Bear", oracle_text=""
-        )
+        vanilla = self._commander(type_line="Legendary Creature — Bear", oracle_text="")
         cards = [row("Creature — Goblin", "", rank=10, oid="a")]
         pool = Tier1SynergyStrategy().score(cards, vanilla)
         self.assertIn("no themes", pool.label)

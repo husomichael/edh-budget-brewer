@@ -16,7 +16,9 @@ from django.db.models import Count
 from cards.classification import ROLE_CHOICES, classify
 from cards.models import Card
 
-OVERRIDES_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "role_overrides.json"
+OVERRIDES_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "data" / "role_overrides.json"
+)
 
 BATCH_SIZE = 2000
 
@@ -122,6 +124,4 @@ class Command(BaseCommand):
         labels = dict(ROLE_CHOICES)
         for row in rows:
             role = row["primary_role"]
-            self.stdout.write(
-                f"  {labels.get(role, role):16} {row['n']:6}"
-            )
+            self.stdout.write(f"  {labels.get(role, role):16} {row['n']:6}")

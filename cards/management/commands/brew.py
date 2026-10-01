@@ -126,7 +126,11 @@ class Command(BaseCommand):
             cards = grouped.get(role)
             if not cards:
                 continue
-            w(self.style.MIGRATE_LABEL(f"=== {role.upper().replace('_', ' ')} ({len(cards)}) ==="))
+            w(
+                self.style.MIGRATE_LABEL(
+                    f"=== {role.upper().replace('_', ' ')} ({len(cards)}) ==="
+                )
+            )
             for cand in sorted(cards, key=lambda c: (-c.price_cents, c.name)):
                 w(f"  {cand.name[:44]:<46} ${cand.price_cents / 100:>7.2f}")
             w("")
@@ -140,8 +144,11 @@ class Command(BaseCommand):
 
         over = r.total_cents > r.budget_cents
         total = f"${r.total_cents / 100:.2f} / ${r.budget_cents / 100:.2f} budget"
-        w(self.style.ERROR(f"Total: {total}  OVER BUDGET") if over
-          else self.style.SUCCESS(f"Total: {total}"))
+        w(
+            self.style.ERROR(f"Total: {total}  OVER BUDGET")
+            if over
+            else self.style.SUCCESS(f"Total: {total}")
+        )
         w(f"  lands  ${r.land_cents / 100:.2f}")
         w(f"  spells ${r.spell_cents / 100:.2f}")
         w(f"Cards: {r.card_count}")

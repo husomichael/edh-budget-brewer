@@ -19,7 +19,7 @@ import json
 import shutil
 import ssl
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -341,7 +341,7 @@ def _can_be_commander(type_line, oracle_text):
 
 
 def _now():
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _now_iso():

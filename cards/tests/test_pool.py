@@ -110,8 +110,9 @@ class BuildPoolTests(TestCase):
         )
 
     def test_score_per_dollar_rewards_cheap_value(self):
-        cheap = make_card("Cheap Good", color_identity=["R"], price_cents=50, edhrec_rank=10)
-        pricey = make_card("Pricey Good", color_identity=["R"], price_cents=5000, edhrec_rank=10)
+        # Created for their effect on the pool; the returned rows are unused.
+        make_card("Cheap Good", color_identity=["R"], price_cents=50, edhrec_rank=10)
+        make_card("Pricey Good", color_identity=["R"], price_cents=5000, edhrec_rank=10)
         pool = build_pool(self.commander)
         by_name = {c.name: c for c in pool.candidates}
         self.assertGreater(

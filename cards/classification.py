@@ -129,7 +129,9 @@ RECURSION_PATTERNS = [
     # both target any graveyard, and reanimation is the main use of this role.
     re.compile(r"from\s+(your|a|target player's)\s+graveyard\s+to\s+", _P),
     re.compile(r"return\s+.{0,40}from\s+(your|a)\s+graveyard", _P),
-    re.compile(r"put\s+.{0,40}from\s+(your|a)\s+graveyard\s+onto\s+the\s+battlefield", _P),
+    re.compile(
+        r"put\s+.{0,40}from\s+(your|a)\s+graveyard\s+onto\s+the\s+battlefield", _P
+    ),
     re.compile(r"\breanimate\b", _P),
 ]
 

@@ -183,9 +183,7 @@ def _distribute_basics(slots, weights, by_name):
     shortfall = slots - sum(counts.values())
 
     # Hand out the leftover slots to the largest fractional remainders.
-    remainders = sorted(
-        available, key=lambda c: (-(exact[c] - counts[c]), c)
-    )
+    remainders = sorted(available, key=lambda c: (-(exact[c] - counts[c]), c))
     for color in remainders[:shortfall]:
         counts[color] += 1
 
