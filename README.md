@@ -10,11 +10,25 @@ interaction, and a reasonable curve.
 
 ## Status
 
-Phase 1 done: Django runs on Postgres, the full Scryfall card database syncs
-locally (~34.5k cards in under 10 seconds), and cards are browsable in the
-Django admin. The optimizer itself is not built yet. See the
-[issues](https://github.com/husomichael/edh-budget-brewer/issues) for the
-build plan.
+**It generates decks.** `manage.py brew` produces a complete, legal, 100-card
+Commander deck within a dollar budget in well under a second.
+
+Working: Scryfall sync, role classification, Tier 0 scoring, candidate pool,
+mana base, the knapsack solver, and the CLI. Not yet built: Tier 1 synergy
+inference, the upgrade path, the API, and the frontend. See the
+[issues](https://github.com/husomichael/edh-budget-brewer/issues).
+
+### Try it
+
+```bash
+manage.py brew "Krenko, Mob Boss" --budget 75
+manage.py brew "Muldrotha, the Gravetide" --budget 200 --format text
+manage.py brew "Atraxa, Praetors' Voice" --budget 150 --format json
+```
+
+`--format text` emits `1 Card Name` per line, which pastes directly into
+Moxfield or Archidekt. Partial commander names work when unambiguous
+(`"Muldrotha"`); ambiguous ones list the matches (`"Krenko"` → three).
 
 ## Setup
 
@@ -58,6 +72,26 @@ manage.py sync_cards --limit 500  # first 500 cards only, for testing
 Re-running is idempotent. The command reads Scryfall's `bulk-data` index, pulls
 the gzipped JSONL `oracle_cards` file (one row per logical card), and upserts on
 `oracle_id`.
+
+### classify_cards
+
+```bash
+manage.py classify_cards --report    # role distribution summary
+```
+
+Assigns each card a functional role (ramp, draw, removal, sweeper, ...) from
+regex over its type line and oracle text, with a curated override table for
+cards whose role is not inferable from wording. Separate from `sync_cards`
+because the rules get tuned often. Run it after any sync.
+
+### brew
+
+```bash
+manage.py brew "<commander>" --budget <dollars> [--lands N] [--format FMT]
+```
+
+Solves in ~25-500ms depending on color count. Exits with a clear error naming
+the real minimum if the budget cannot produce a legal deck.
 
 ## How it works
 

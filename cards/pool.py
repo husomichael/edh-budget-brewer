@@ -8,6 +8,8 @@ nothing else.
 from dataclasses import dataclass
 from decimal import Decimal
 
+from django.db.models import Q
+
 from cards.models import Card
 from cards.scoring import Tier0PopularityStrategy
 
@@ -18,6 +20,7 @@ POOL_FIELDS = (
     "name",
     "price_cents",
     "cmc",
+    "mana_cost",
     "type_line",
     "primary_role",
     "secondary_role",
@@ -36,6 +39,7 @@ class Candidate:
     name: str
     price_cents: int
     cmc: Decimal
+    mana_cost: str
     type_line: str
     primary_role: str
     secondary_role: str
@@ -94,16 +98,19 @@ def build_pool(commander, strategy=None, owned_free=False, partner=None):
       * commander-legal and not banned
       * color identity is a subset of the commander's (Postgres array
         containment, GIN-indexed -- the hottest query in the project)
-      * has a USD price, since an unpriceable card is unbuyable
+      * has a USD price, since an unpriceable card is unbuyable -- except
+        basic lands, which Scryfall prices as null but which are free and
+        unlimited, the one case where "no price" means free rather than
+        unbuyable
       * is not the commander or partner itself
     """
     strategy = strategy or Tier0PopularityStrategy()
 
     qs = (
         Card.objects.filter(
+            Q(price_cents__isnull=False) | Q(is_basic=True),
             legal_commander=True,
             is_banned=False,
-            price_cents__isnull=False,
             color_identity__contained_by=commander.color_identity,
         )
         .exclude(pk=commander.pk)
@@ -125,8 +132,9 @@ def build_pool(commander, strategy=None, owned_free=False, partner=None):
             # zeroes out cards already in the collection.
             price_cents=0
             if (row["is_basic"] or str(row["oracle_id"]) in owned)
-            else row["price_cents"],
+            else (row["price_cents"] or 0),
             cmc=row["cmc"],
+            mana_cost=row["mana_cost"],
             type_line=row["type_line"],
             primary_role=row["primary_role"],
             secondary_role=row["secondary_role"],

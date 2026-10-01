@@ -15,6 +15,7 @@ def make_card(name, **kwargs):
         "scryfall_id": uuid.uuid4(),
         "name": name,
         "cmc": 2,
+        "mana_cost": "{1}{R}",
         "type_line": "Creature",
         "color_identity": [],
         "colors": [],

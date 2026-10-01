@@ -291,7 +291,7 @@ class Command(BaseCommand):
             legal_commander=(commander_legality == "legal"),
             is_banned=(commander_legality == "banned"),
             edhrec_rank=raw.get("edhrec_rank"),
-            is_land="Land" in type_line,
+            is_land=_is_land(type_line),
             is_basic="Basic Land" in type_line,
             can_be_commander=_can_be_commander(type_line, oracle_text or ""),
             layout=(raw.get("layout") or "")[:40],
@@ -313,6 +313,18 @@ def _price_cents(prices):
             except (TypeError, ValueError):
                 continue
     return None
+
+
+def _is_land(type_line):
+    """Whether the FRONT face is a land.
+
+    Modal double-faced cards like Agadeem's Awakening have type_line
+    "Sorcery // Land" -- they are spells that may optionally be played as a
+    land, and counting them as lands pollutes the mana base. Pathway lands are
+    "Land // Land" and correctly remain lands.
+    """
+    front = type_line.split("//")[0]
+    return "Land" in front
 
 
 def _can_be_commander(type_line, oracle_text):
