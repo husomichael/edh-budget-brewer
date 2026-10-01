@@ -84,6 +84,7 @@ def serialize_candidate(cand, quantity=1):
         "cmc": float(cand.cmc),
         "mana_cost": cand.mana_cost,
         "type_line": cand.type_line,
+        "image_uri": cand.image_uri,
         "role": cand.primary_role,
         "secondary_role": cand.secondary_role,
         "score": round(cand.score, 4),

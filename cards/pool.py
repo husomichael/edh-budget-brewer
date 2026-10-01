@@ -23,6 +23,7 @@ POOL_FIELDS = (
     "mana_cost",
     "type_line",
     "oracle_text",
+    "image_uri",
     "primary_role",
     "secondary_role",
     "edhrec_rank",
@@ -52,6 +53,7 @@ class Candidate:
     cmc: Decimal
     mana_cost: str
     type_line: str
+    image_uri: str
     primary_role: str
     secondary_role: str
     is_land: bool
@@ -164,6 +166,7 @@ def _make_candidate(row, scored, owned, locked):
         cmc=row["cmc"],
         mana_cost=row["mana_cost"],
         type_line=row["type_line"],
+        image_uri=row["image_uri"],
         primary_role=row["primary_role"],
         secondary_role=row["secondary_role"],
         is_land=row["is_land"],

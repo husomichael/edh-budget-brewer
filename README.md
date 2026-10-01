@@ -13,10 +13,10 @@ interaction, and a reasonable curve.
 **It generates decks.** `manage.py brew` produces a complete, legal, 100-card
 Commander deck within a dollar budget in well under a second.
 
-Working: Scryfall sync, role classification, Tier 0 and Tier 1 scoring, the
-candidate pool, mana base, the knapsack solver, deck/collection storage,
-own-it-already pricing, the marginal upgrade path, and the CLI. Not yet built:
-Tier 2 paste import, the API, and the frontend. See the
+Working end to end: Scryfall sync, role classification, Tier 0 and Tier 1
+scoring, the candidate pool, mana base, the knapsack solver, deck/collection
+storage, own-it-already pricing, the marginal upgrade path, a REST API, and a
+React frontend. Not yet built: Tier 2 paste import. See the
 [issues](https://github.com/husomichael/edh-budget-brewer/issues).
 
 ### Try it
@@ -51,6 +51,18 @@ createdb edh_budget_brewer
 ```
 
 Then browse the card database at `/admin/cards/card/`.
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open **http://localhost:5173**. Vite dev-proxies `/api` to Django on port 8000,
+so both servers need to be running and there is no CORS setup to do. Note that
+Vite binds IPv6 `[::1]` only, so use `localhost` rather than `127.0.0.1`.
 
 **Note on the Postgres port.** On the machine this was built on, Homebrew's
 `postgresql@16` listens on **5433**, not the default 5432 — port 5432 is a
@@ -240,9 +252,29 @@ your commander and infer that your specific build wants sacrifice outlets over
 
 ## Stack
 
-- **Backend:** Django + Django REST Framework (Python 3.13)
-- **Database:** PostgreSQL
-- **Frontend:** React
+- **Backend:** Django 5.2 + Django REST Framework (Python 3.13)
+- **Database:** PostgreSQL 16
+- **Frontend:** React 19 + TypeScript + Vite
+
+## API
+
+```
+GET  /api/commanders/?q=         commander autocomplete
+GET  /api/cards/ , /api/cards/<oracle_id>/
+POST /api/brew/                  generate a deck
+POST /api/brew/save/             generate and persist
+GET  /api/decks/ , /api/decks/<id>/
+GET  /api/collection/
+POST /api/collection/import/     paste a collection list
+```
+
+`POST /api/brew/` is deterministic — identical input always returns an
+identical deck. An infeasible budget returns `400` carrying `minimum_cents`,
+so a client can offer to raise the budget rather than just reporting failure.
+
+The API is open (`AllowAny`) because this is a single-user local tool. **Do not
+deploy it as-is** — an open write API would let anyone edit the collection and
+decks.
 
 ## Data sources and attribution
 

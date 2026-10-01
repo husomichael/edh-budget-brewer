@@ -58,6 +58,7 @@ def candidate(mana_cost):
         cmc=2,
         mana_cost=mana_cost,
         type_line="",
+        image_uri="",
         primary_role=SYNERGY,
         secondary_role="",
         is_land=False,
