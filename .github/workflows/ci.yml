@@ -27,7 +27,10 @@ jobs:
           --health-retries 5
 
     env:
-      SECRET_KEY: ci-only-not-a-real-secret
+      # 50+ characters: the deploy check enforces security.W009, and
+      # lowering --fail-level to accommodate a short key would defeat the
+      # point of the gate. Obviously fake, and public in this file.
+      SECRET_KEY: ci-only-not-a-real-secret-0123456789-abcdefghij-klmnop
       DEBUG: "False"
       DATABASE_URL: postgres://ebb:ebb@localhost:5432/edh_budget_brewer
       SCRYFALL_USER_AGENT: edh-budget-brewer-ci/0.1
