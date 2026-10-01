@@ -1,18 +1,13 @@
-"""Views that belong to the deployment rather than to the card domain."""
+"""Views that belong to the deployment rather than to the card domain.
+
+The health check is NOT here: it lives in config.middleware, because it has
+to answer before ALLOWED_HOSTS validation and the HTTPS redirect get a
+chance to reject it.
+"""
 
 from django.conf import settings
 from django.http import HttpResponse, HttpResponseServerError
 from django.views import View
-
-
-def healthz(request):
-    """Liveness probe for the hosting platform.
-
-    Deliberately does not touch the database. A health check that queries
-    Postgres turns a database blip into a rolling restart of healthy app
-    instances, which makes an outage worse rather than shorter.
-    """
-    return HttpResponse("ok", content_type="text/plain")
 
 
 class SpaView(View):

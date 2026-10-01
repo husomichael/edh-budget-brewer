@@ -67,6 +67,18 @@ These each cost real debugging time. Check here before re-deriving them.
   settings dict at import time, so the override is silently ignored and tests
   assert the wrong thing while throttling stays live. Patch the class
   attribute instead — see `conftest.py` and `test_throttling_and_cache.py`.
+- **The health check must bypass `ALLOWED_HOSTS` and `SECURE_SSL_REDIRECT`.**
+  `config.middleware.HealthCheckMiddleware` runs before SecurityMiddleware
+  and answers `/healthz` directly. The first real deploy failed because a
+  placeholder `ALLOWED_HOSTS` made every probe `400 DisallowedHost` until the
+  deploy timed out, while the app ran fine. Fixing only the host would have
+  turned it into a `301`, since the internal probe is plain HTTP with no
+  `X-Forwarded-Proto`. **Never route the health check through normal
+  middleware.**
+- **`ALLOWED_HOSTS` / `CSRF_TRUSTED_ORIGINS` are derived from
+  `RENDER_EXTERNAL_HOSTNAME`**, not configured. "Deploy with a placeholder,
+  fix the hostname afterwards" is impossible: the bad placeholder fails the
+  health check, so the deploy never succeeds and the fix-up step never runs.
 - **Readiness is a completion check, not a row count.** `sync_cards` writes in
   batches, so an interrupted load leaves a plausible-looking 31k of 34.5k
   rows. A count threshold accepts that and freezes the database permanently

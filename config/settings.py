@@ -11,6 +11,7 @@ env = environ.Env(
     ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1"]),
     DEMO_MODE=(bool, False),
     HTTPS_ONLY=(bool, False),
+    RENDER_EXTERNAL_HOSTNAME=(str, ""),
     # Brew responses are cacheable because the solver is deterministic. 24h,
     # not longer: Scryfall prices move daily, and a week-old price is a lie.
     # 0 disables caching entirely.
@@ -28,6 +29,9 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+
+# Path answered by HealthCheckMiddleware before any other request handling.
+HEALTH_CHECK_PATH = "/healthz"
 
 # Read-only showcase mode for the public demo. When on, the write routes are
 # never registered (so they 404 rather than 403) and the Django admin is not
@@ -48,6 +52,10 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # First, ahead of SecurityMiddleware: the health check must not be
+    # rejectable by ALLOWED_HOSTS or redirected by SECURE_SSL_REDIRECT.
+    # See config.middleware.HealthCheckMiddleware.
+    "config.middleware.HealthCheckMiddleware",
     "django.middleware.security.SecurityMiddleware",
     # Directly after SecurityMiddleware and before everything else, per
     # WhiteNoise's docs: static files should not pay for session loading,
@@ -138,6 +146,19 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 HTTPS_ONLY = env("HTTPS_ONLY")
 
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
+
+# Render sets this automatically to the service's own onrender.com hostname.
+# Trusting it removes a genuine chicken-and-egg: the hostname does not exist
+# until the service does, but a wrong ALLOWED_HOSTS makes every request 400,
+# so a "deploy, then come back and set the hostname" step can never run --
+# the first deploy never goes healthy. Derived rather than prompted for.
+RENDER_EXTERNAL_HOSTNAME = env("RENDER_EXTERNAL_HOSTNAME")
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS = [*ALLOWED_HOSTS, RENDER_EXTERNAL_HOSTNAME]
+    CSRF_TRUSTED_ORIGINS = [
+        *CSRF_TRUSTED_ORIGINS,
+        f"https://{RENDER_EXTERNAL_HOSTNAME}",
+    ]
 
 if HTTPS_ONLY:
     SECURE_SSL_REDIRECT = True

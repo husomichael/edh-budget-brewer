@@ -2,10 +2,13 @@ from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path, re_path
 
-from config.views import SpaView, healthz
+from config.views import SpaView
 
+# settings.HEALTH_CHECK_PATH is answered by HealthCheckMiddleware before
+# routing, so it is deliberately absent here. It stays in the catch-all's
+# exclusion list below so it 404s rather than serving HTML if that middleware
+# is ever removed.
 urlpatterns = [
-    path("healthz", healthz, name="healthz"),
     path("api/", include("cards.urls")),
 ]
 
