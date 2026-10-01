@@ -26,7 +26,7 @@ manage.py brew "Krenko, Mob Boss" --budget 75
 manage.py brew "Muldrotha, the Gravetide" --budget 200 --format text
 manage.py brew "Atraxa, Praetors' Voice" --budget 150 --format json
 
-manage.py brew "Krenko" --budget 50 --upgrade-path   # what the next $25 buys
+manage.py brew "Krenko, Mob Boss" --budget 50 --upgrade-path   # what the next $25 buys
 manage.py brew "Edgar Markov" --budget 100 --owned-free   # collection is free
 manage.py brew "Talrand" --budget 60 --save --name "Budget Drakes"
 ```
@@ -275,6 +275,12 @@ so a client can offer to raise the budget rather than just reporting failure.
 The API is open (`AllowAny`) because this is a single-user local tool. **Do not
 deploy it as-is** — an open write API would let anyone edit the collection and
 decks.
+
+## Related
+
+The optimizer engine is also available as a standalone command-line tool, with
+no web layer, at
+[**edh-budget-brewer-cli**](https://github.com/husomichael/edh-budget-brewer-cli).
 
 ## Data sources and attribution
 
