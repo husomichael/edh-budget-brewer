@@ -78,6 +78,22 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+REST_FRAMEWORK = {
+    # Single-user local tool, so the API is open. This is deliberate and is
+    # safe only because nothing is exposed beyond localhost.
+    #
+    # DO NOT deploy this publicly as-is. The brew endpoints read a local card
+    # database built from Scryfall bulk data, which is fine, but an open write
+    # API would also let anyone edit the collection and decks.
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
+    "PAGE_SIZE": 50,
+}
+
 # --- Project settings -------------------------------------------------------
 
 # Scryfall requires a descriptive User-Agent and an explicit Accept header.
