@@ -294,3 +294,12 @@ label { display: block; font-weight: 600; font-size: .85rem; margin-bottom: .3re
 .app-footer p { margin: 0 0 .6rem; max-width: 70ch; }
 .app-footer a { color: var(--accent); }
 .app-footer .legal { font-size: .75rem; opacity: .8; }
+
+/* Shown only while a freshly deployed instance is still loading cards. */
+.notice {
+  background: var(--panel); border: 1px solid var(--warn);
+  border-left-width: 3px; border-radius: 8px;
+  padding: .75rem 1rem; margin-bottom: 1rem;
+  color: var(--text); font-size: .9rem; line-height: 1.5;
+}
+.notice strong { color: var(--warn); }

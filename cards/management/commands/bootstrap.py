@@ -20,6 +20,7 @@ refresh prices.
 Usage:
     manage.py bootstrap              # first deploy: all four steps
     manage.py bootstrap --refresh    # nightly: prices and roles only
+    manage.py bootstrap --if-empty   # on boot: migrate, then load only if needed
 """
 
 import time
@@ -27,13 +28,7 @@ import time
 from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 
-from cards.models import Card
-
-# Below this, something went wrong upstream even if every command exited 0.
-# Scryfall's oracle set has been well above 30k for years, so a sync that
-# lands under this is a truncated download or a changed bulk format, not a
-# quiet year for Magic.
-MINIMUM_PLAUSIBLE_CARDS = 25_000
+from cards.models import MINIMUM_PLAUSIBLE_CARDS, Card, card_data_is_loaded
 
 
 class Command(BaseCommand):
@@ -52,6 +47,17 @@ class Command(BaseCommand):
             ),
         )
         parser.add_argument(
+            "--if-empty",
+            action="store_true",
+            help=(
+                "Migrate, then load card data only if the database does not "
+                "already have it. For running on container start, where there "
+                "is no shell to run the full bootstrap from. Skips "
+                "sync_catalogs: those are checked-in fixtures, so refreshing "
+                "them is a maintenance task rather than a boot task."
+            ),
+        )
+        parser.add_argument(
             "--skip-sync",
             action="store_true",
             help=(
@@ -64,8 +70,34 @@ class Command(BaseCommand):
         refresh = options["refresh"]
         started = time.monotonic()
 
+        # --if-empty migrates first and separately, because the card count it
+        # branches on cannot be read until the table exists.
+        if options["if_empty"]:
+            self.stdout.write(self.style.MIGRATE_HEADING("[1/2] migrate"))
+            call_command("migrate", interactive=False, stdout=self.stdout)
+            existing = self._card_count()
+            if card_data_is_loaded():
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Already holds {existing} fully classified cards. "
+                        f"Nothing to load."
+                    )
+                )
+                return
+            if existing:
+                # Reached when a previous load was interrupted. Reloads from
+                # scratch rather than resuming: sync_cards is idempotent, and
+                # the bulk file went with the old container's filesystem, so
+                # there is nothing to resume from.
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"{existing} cards present but the load is "
+                        f"incomplete. Reloading from scratch."
+                    )
+                )
+
         steps = []
-        if not refresh:
+        if not refresh and not options["if_empty"]:
             steps.append(("migrate", {"interactive": False}))
             steps.append(("sync_catalogs", {}))
         if not options["skip_sync"]:

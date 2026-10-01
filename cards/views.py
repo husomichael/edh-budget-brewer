@@ -16,7 +16,7 @@ from rest_framework.views import APIView
 
 from cards.decks import save_brew
 from cards.importers import import_collection
-from cards.models import Card, CollectionItem, Deck
+from cards.models import Card, CollectionItem, Deck, card_data_is_loaded
 from cards.pool import build_pool
 from cards.scoring import Tier0PopularityStrategy
 from cards.serializers import (
@@ -64,6 +64,26 @@ def brew_cache_key(data):
     return f"brew:{BREW_CACHE_VERSION}:{digest}"
 
 
+# Sticky, because the answer only ever goes from false to true: the card
+# table is loaded once and never emptied in normal operation. Caching it in
+# the process keeps /api/config/ from running a COUNT on every page load --
+# which on a 0.1 CPU instance is not free.
+_data_ready = False
+
+
+def data_is_ready():
+    """Whether the card table has enough rows to brew with.
+
+    False during the window after a fresh deploy where the app is serving but
+    the background load has not finished. The UI uses this to say so, rather
+    than showing an empty commander search and looking broken.
+    """
+    global _data_ready
+    if not _data_ready:
+        _data_ready = card_data_is_loaded()
+    return _data_ready
+
+
 class ConfigView(APIView):
     """Runtime feature flags for the frontend.
 
@@ -75,7 +95,9 @@ class ConfigView(APIView):
     throttle_scope = "read"
 
     def get(self, request):
-        return Response({"demo_mode": settings.DEMO_MODE})
+        return Response(
+            {"demo_mode": settings.DEMO_MODE, "data_ready": data_is_ready()}
+        )
 
 
 class CommanderSearchView(generics.ListAPIView):

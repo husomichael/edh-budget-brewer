@@ -352,9 +352,14 @@ manage.py bootstrap            # empty environment -> serving brews
 manage.py bootstrap --refresh  # nightly: prices and roles only
 ```
 
-A fresh environment has an empty card table and every brew returns
-`infeasible_budget` until `bootstrap` has run. **[DEPLOY.md](DEPLOY.md) is the
-full runbook** — environment variables, first deploy, rollback, and cost.
+On a hosted deploy there is no manual step: `docker-entrypoint.sh` migrates
+and runs `bootstrap --if-empty` on container start, because Render's free tier
+has no shell to run it from. The load happens in the background so the service
+goes healthy in ~100s rather than ~7.5 minutes, and `/api/config/` reports
+`data_ready` so the UI can say it is still loading instead of looking broken.
+
+**[DEPLOY.md](DEPLOY.md) is the full runbook** — environment variables, first
+deploy, the free tier's trade-offs, rollback, and what to change to go paid.
 
 ## Related
 

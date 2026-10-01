@@ -21,6 +21,10 @@ remaining unknown.
 **All of Phase 4 is now implemented** (#20-#29 except #19, which is Phase 5).
 The only thing not done is actually running the Render blueprint.
 
+Targeting Render's **free tier**, which shapes the deployment: no shell and no
+pre-deploy command (so `docker-entrypoint.sh` self-initialises), no cron (so
+prices go stale), and the database expires every 30 days.
+
 ## Running it
 
 ```bash
@@ -63,6 +67,12 @@ These each cost real debugging time. Check here before re-deriving them.
   settings dict at import time, so the override is silently ignored and tests
   assert the wrong thing while throttling stays live. Patch the class
   attribute instead — see `conftest.py` and `test_throttling_and_cache.py`.
+- **Readiness is a completion check, not a row count.** `sync_cards` writes in
+  batches, so an interrupted load leaves a plausible-looking 31k of 34.5k
+  rows. A count threshold accepts that and freezes the database permanently
+  incomplete. `card_data_is_loaded()` requires every card to have a
+  `role_source`, which only `classify_cards` sets. Verified by killing a
+  container mid-load.
 - **Docker locally is colima, not Docker Desktop.** `brew install colima
   docker`, then `colima start`. Docker Desktop was uninstalled in 2023 and
   left broken symlinks in `/usr/local/bin` plus `"credsStore": "desktop"` in

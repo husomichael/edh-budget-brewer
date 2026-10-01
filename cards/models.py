@@ -21,6 +21,33 @@ COLOR_CHOICES = [
 ]
 
 
+# Below this, the card table is not usable even if every command exited 0:
+# a truncated download or a changed bulk format. Scryfall's oracle set has
+# been well above 30k for years, so a sync landing under this is a fault, not
+# a quiet year for Magic.
+MINIMUM_PLAUSIBLE_CARDS = 25_000
+
+
+def card_data_is_loaded():
+    """Whether the card table is complete enough to brew with.
+
+    Deliberately not just a row count. `sync_cards` writes in batches of
+    1000, so a restart part-way through leaves a plausible-looking number of
+    rows -- 31k of 34.5k -- and a count-based check accepts it, freezing the
+    database permanently incomplete. That is not hypothetical: a free
+    instance spins down after 15 minutes of inactivity, which can land in
+    the middle of a six-minute first load.
+
+    `role_source` is the completion marker. Newly created rows have it empty
+    and only `classify_cards`, the last step, fills it in, so an unclassified
+    row means the load did not finish. Checked first because it short-circuits
+    cheaply in exactly the partial case that matters.
+    """
+    if Card.objects.filter(role_source="").exists():
+        return False
+    return Card.objects.count() >= MINIMUM_PLAUSIBLE_CARDS
+
+
 class Card(models.Model):
     # oracle_id is stable across printings; scryfall_id identifies one printing.
     # We sync the `oracle_cards` bulk file, which is one row per logical card,

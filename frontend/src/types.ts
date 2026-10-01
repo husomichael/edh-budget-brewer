@@ -5,6 +5,12 @@
 export interface AppConfig {
   /** Read-only public deployment: no collection, no saved decks. */
   demo_mode: boolean
+  /**
+   * Whether the card table is loaded. False in the window after a fresh
+   * deploy where the app serves but the background data load is still
+   * running -- brewing cannot work yet, and the UI says so.
+   */
+  data_ready: boolean
 }
 
 export type Role =

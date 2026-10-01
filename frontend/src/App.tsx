@@ -33,6 +33,9 @@ export default function App() {
   // read, assume demo and hide the write UI. Hiding a feature is never a
   // security problem, whereas showing one that 404s is a broken demo.
   const [demoMode, setDemoMode] = useState<boolean | null>(null)
+  // Starts true so the warning never flashes on a healthy instance; only a
+  // config response that explicitly says otherwise turns it off.
+  const [dataReady, setDataReady] = useState(true)
   const [commander, setCommander] = useState<Commander | null>(null)
   const [settings, setSettings] = useState<BrewSettings>(DEFAULT_SETTINGS)
   const [result, setResult] = useState<Brew | null>(null)
@@ -41,10 +44,21 @@ export default function App() {
   const [minimumCents, setMinimumCents] = useState<number | null>(null)
 
   useEffect(() => {
-    getConfig().then(
-      (config) => setDemoMode(config.demo_mode),
-      () => setDemoMode(true),
-    )
+    let timer: number | undefined
+    const poll = () => {
+      getConfig().then(
+        (config) => {
+          setDemoMode(config.demo_mode)
+          setDataReady(config.data_ready)
+          // Re-check while loading, so the notice clears on its own rather
+          // than requiring a reload. ~6.5 min on a 0.1 CPU instance.
+          if (!config.data_ready) timer = window.setTimeout(poll, 15_000)
+        },
+        () => setDemoMode(true),
+      )
+    }
+    poll()
+    return () => window.clearTimeout(timer)
   }, [])
 
   // Restore a shared link: resolve the commander slug, then brew. Runs once,
@@ -174,6 +188,15 @@ export default function App() {
           </nav>
         )}
       </header>
+
+      {!dataReady && (
+        <div className="notice">
+          <strong>Loading card data.</strong> This instance was just deployed
+          and is downloading ~34,500 cards from Scryfall. It takes a few
+          minutes on a free instance. Brewing will not work until it
+          finishes &mdash; this notice clears itself.
+        </div>
+      )}
 
       {tab === 'collection' && demoMode === false ? (
         <main className="single">

@@ -1,11 +1,22 @@
-# Render blueprint: one web service, one managed Postgres, one nightly cron.
+# Render blueprint: free tier.
 #
-# Create it with Render's "New Blueprint" flow pointed at this repo. The two
-# `sync: false` vars below are prompted for at creation time, because they
-# depend on the hostname Render assigns and so cannot be known in advance.
+# One free web service and one free Postgres. Create it with Render's
+# "New Blueprint" flow pointed at this repo. The two `sync: false` vars are
+# prompted for at creation time, because they depend on the hostname Render
+# assigns and cannot be known in advance.
 #
-# See DEPLOY.md for the full runbook, including the one-off bootstrap step
-# that this file deliberately does not do.
+# The free tier shapes this file in three ways, each of which would otherwise
+# be a silent failure:
+#
+#   1. No shell and no pre-deploy command, so there is nowhere to run
+#      migrations or the initial data load from. docker-entrypoint.sh does it
+#      on container start instead.
+#   2. No cron jobs, so there is no nightly price refresh. Prices go stale;
+#      the UI reports how old they are rather than pretending otherwise.
+#   3. Free Postgres expires 30 days after creation, with a 14-day grace
+#      period before deletion. See DEPLOY.md for the monthly chore.
+#
+# DEPLOY.md is the runbook, including what to change to move to paid.
 
 databases:
   - name: edh-budget-brewer-db
@@ -14,9 +25,8 @@ databases:
     # Postgres is required, not a preference: the colour-identity filter uses
     # the array containment operator against a GIN index.
     #
-    # 256MB is ample. The whole dataset is ~34.5k rows, and the working set is
-    # the GIN index rather than the table.
-    plan: 0.1c-256mb
+    # EXPIRES 30 DAYS AFTER CREATION. Only one free database per workspace.
+    plan: free
     postgresMajorVersion: "16"
     region: oregon
 
@@ -25,17 +35,20 @@ services:
     name: edh-budget-brewer
     runtime: docker
     region: oregon
-    # Memory, not CPU, is the binding constraint: a five-colour brew loads
-    # ~24k candidate rows and peaks around 50MB per worker. 512MB holds two
-    # workers with room to spare.
-    plan: 0.5c-512mb
+    # 0.1 CPU, 512MB, spins down after 15 minutes of inactivity with a ~1
+    # minute cold start.
+    #
+    # Memory is fine: measured at 135MiB peak during the first-boot data load
+    # and 262-274MiB under a burst of concurrent five-colour brews on a paid
+    # instance. CPU is the real constraint here -- an uncached five-colour
+    # brew takes ~11s at 0.1 CPU versus 0.6s on a full core. The 24h brew
+    # cache is what makes that tolerable: a repeat of the same brew is 0.08s.
+    plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /healthz
-    # migrate only. The full bootstrap downloads ~25MB from Scryfall and takes
-    # about a minute, which is too long to hold up every deploy -- and it only
-    # needs to happen once per environment. Run it from the Shell instead;
-    # DEPLOY.md step 5.
-    preDeployCommand: python manage.py migrate --noinput
+    #
+    # No preDeployCommand: it requires a paid instance type. Migrations run in
+    # docker-entrypoint.sh instead.
     envVars:
       - key: SECRET_KEY
         generateValue: true
@@ -53,21 +66,21 @@ services:
       # SECURE_PROXY_SSL_HEADER. Without that, SECURE_SSL_REDIRECT loops.
       - key: HTTPS_ONLY
         value: "True"
+      # One worker. At 0.1 CPU a second buys no parallelism and costs ~50MB.
       - key: WEB_CONCURRENCY
-        value: "2"
-      # Cache and rate limits. Explicit rather than left to defaults, because
-      # these are the two knobs worth turning if the demo gets traffic.
+        value: "1"
+      # Cache and rate limits. The cache matters far more here than on a paid
+      # instance: it is the difference between an 11s brew and an 0.08s one.
       #
-      # NOTE: locmem is per-process, so with 2 workers there are two
-      # independent throttle counters and the real limit is ~40/min. Set
-      # CACHE_URL to a Redis instance to make it exact and to share the brew
-      # cache between workers.
+      # Locmem is per-process, which is exactly right with one worker.
       - key: BREW_CACHE_SECONDS
         value: "86400"
+      # Lower than the paid default of 20/min: at 0.1 CPU, 20 uncached brews
+      # in a minute is far more than the instance can serve.
       - key: BREW_THROTTLE_RATE
-        value: 20/min
+        value: 8/min
       - key: READ_THROTTLE_RATE
-        value: 120/min
+        value: 60/min
       # Scryfall requires a descriptive User-Agent identifying the app.
       - key: SCRYFALL_USER_AGENT
         value: edh-budget-brewer/0.1 (+https://github.com/husomichael/edh-budget-brewer)
@@ -77,29 +90,3 @@ services:
         sync: false
       - key: CSRF_TRUSTED_ORIGINS
         sync: false
-
-  - type: cron
-    name: edh-budget-brewer-refresh
-    runtime: docker
-    region: oregon
-    plan: 0.5c-512mb
-    # 10:00 UTC daily, after Scryfall's own daily bulk rebuild. Prices move
-    # every day, which is exactly why DeckCard.price_at_generation exists.
-    schedule: "0 10 * * *"
-    dockerfilePath: ./Dockerfile
-    # --refresh skips migrate and sync_catalogs: the schema and the type
-    # catalogs are already in place, so this is prices and roles only.
-    dockerCommand: python manage.py bootstrap --refresh
-    envVars:
-      # Not shared with the web service on purpose. This process serves no
-      # requests and signs nothing, so the two keys never need to match.
-      - key: SECRET_KEY
-        generateValue: true
-      - key: DATABASE_URL
-        fromDatabase:
-          name: edh-budget-brewer-db
-          property: connectionString
-      - key: DEBUG
-        value: "False"
-      - key: SCRYFALL_USER_AGENT
-        value: edh-budget-brewer/0.1 (+https://github.com/husomichael/edh-budget-brewer)

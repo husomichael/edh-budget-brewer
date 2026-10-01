@@ -34,7 +34,7 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install -r requirements.txt
 
-COPY manage.py ./
+COPY manage.py docker-entrypoint.sh ./
 COPY config/ ./config/
 COPY cards/ ./cards/
 COPY --from=frontend /build/dist/ ./frontend/dist/
@@ -58,17 +58,24 @@ RUN SECRET_KEY=build-time-only-not-used \
 
 EXPOSE 8000
 
-# Two workers on 512MB. Measured in this image under a burst of 12 concurrent
-# five-colour brews with upgrade paths: 262-274MiB resident, about 54% of a
-# 512MB instance, no timeouts. Memory rather than CPU is the binding
-# constraint, so raise WEB_CONCURRENCY only alongside the instance size.
-# $PORT is whatever the platform assigns; sh -c is needed to expand it.
+# Migrate and load data before serving. See docker-entrypoint.sh for why this
+# happens here rather than in a release or pre-deploy step.
+ENTRYPOINT ["./docker-entrypoint.sh"]
+
+# Memory, not CPU, is the binding constraint. Measured in this image under a
+# burst of 12 concurrent five-colour brews with upgrade paths: 262-274MiB
+# resident, about 54% of a 512MB instance, no timeouts.
 #
+# WEB_CONCURRENCY defaults to 1 because the free instance type is 0.1 CPU,
+# where a second worker buys no parallelism and costs ~50MB. Set it to 2 on a
+# paid instance.
+#
+# $PORT is whatever the platform assigns; sh -c is needed to expand it.
 # --access-logfile - sends request logs to stdout, where the platform collects
 # them. Without it gunicorn logs nothing and a 500 is invisible.
 CMD ["sh", "-c", "gunicorn config.wsgi:application \
   --bind 0.0.0.0:${PORT:-8000} \
-  --workers ${WEB_CONCURRENCY:-2} \
-  --timeout 60 \
+  --workers ${WEB_CONCURRENCY:-1} \
+  --timeout 120 \
   --access-logfile - \
   --error-logfile -"]
