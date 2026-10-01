@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.Python
+
+# Django
+*.log
+db.sqlite3
+/media/
+/staticfiles/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Scryfall bulk downloads (large; fetched via manage.py sync_cards)
+/data/scryfall/
+*.json.gz
+
+# Node / React
+node_modules/
+dist/
+build/
+.vite/
+npm-debug.log*
+
+# Testing / tooling
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store
