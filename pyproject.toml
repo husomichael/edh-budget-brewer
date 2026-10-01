@@ -1,0 +1,22 @@
+[project]
+name = "edh-budget-brewer"
+version = "0.1.0"
+description = "Generate budget MTG Commander decks from a commander and a dollar target."
+requires-python = ">=3.13"
+dependencies = [
+    "Django>=5.2,<6.0",
+    "psycopg[binary]>=3.2",
+    "django-environ>=0.12",
+    "djangorestframework>=3.16",
+    # macOS python.org builds do not use the system cert store; the Scryfall
+    # sync points OpenSSL at certifi's bundle explicitly.
+    "certifi",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+exclude = [".venv", "*/migrations/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "DJ"]

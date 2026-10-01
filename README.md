@@ -10,9 +10,54 @@ interaction, and a reasonable curve.
 
 ## Status
 
-Early scaffolding. Nothing works yet. See the
-[issues](https://github.com/husomichael/edh-budget-brewer/issues) for the build
-plan.
+Phase 1 done: Django runs on Postgres, the full Scryfall card database syncs
+locally (~34.5k cards in under 10 seconds), and cards are browsable in the
+Django admin. The optimizer itself is not built yet. See the
+[issues](https://github.com/husomichael/edh-budget-brewer/issues) for the
+build plan.
+
+## Setup
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+
+cp .env.example .env        # then set SECRET_KEY and check DATABASE_URL
+createdb edh_budget_brewer
+
+.venv/bin/python manage.py migrate
+.venv/bin/python manage.py sync_cards     # downloads ~25 MB from Scryfall
+.venv/bin/python manage.py createsuperuser
+.venv/bin/python manage.py runserver
+```
+
+Then browse the card database at `/admin/cards/card/`.
+
+**Note on the Postgres port.** On the machine this was built on, Homebrew's
+`postgresql@16` listens on **5433**, not the default 5432 — port 5432 is a
+separate instance running as the `postgres` user with password auth. If
+`migrate` cannot connect, check which instance is actually running:
+
+```bash
+brew services list
+grep '^port' /opt/homebrew/var/postgresql@16/postgresql.conf
+```
+
+`psql --version` reports the *client* version, which may not match the running
+server.
+
+### sync_cards
+
+```bash
+manage.py sync_cards              # download if stale, then upsert
+manage.py sync_cards --force      # re-download even if current
+manage.py sync_cards --dry-run    # parse and report, write nothing
+manage.py sync_cards --limit 500  # first 500 cards only, for testing
+```
+
+Re-running is idempotent. The command reads Scryfall's `bulk-data` index, pulls
+the gzipped JSONL `oracle_cards` file (one row per logical card), and upserts on
+`oracle_id`.
 
 ## How it works
 
